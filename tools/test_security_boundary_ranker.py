@@ -161,6 +161,29 @@ class BoundaryRankerTests(unittest.TestCase):
             self.assertEqual(host_item["host_configuration_penalty"], 5)
             self.assertTrue(host_item["host_configuration_signals"])
 
+    def test_explicit_public_fix_dependent_file_is_reference_only(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            dependent = root / "pkg" / "nvcdi" / "transform" / "root" / "builder.go"
+            dependent.parent.mkdir(parents=True)
+            dependent.write_text(
+                "package root\nfunc f(){ _ = filepath.Join; _ = driverRoot }",
+                encoding="utf-8",
+            )
+            exclusions = {"public_fixes": [{
+                "commit": "fix-root",
+                "classification": "PUBLIC_FIX_EXCLUDE",
+                "affected_files": ["pkg/nvcdi/transform/root/root.go"],
+                "dependent_files": ["pkg/nvcdi/transform/root/builder.go"],
+            }]}
+            out = rank(root, exclusions=exclusions)
+            item = out[0]
+            self.assertTrue(item["public_fix_dependency"])
+            self.assertEqual(item["public_fix_dependency_refs"], ["fix-root"])
+            self.assertEqual(item["classification"], "PUBLIC_FIX_DEPENDENCY_REFERENCE_ONLY")
+            self.assertEqual(item["adjacency_bonus"], 0)
+            self.assertFalse(item["submission_ready"])
+
 
 if __name__ == "__main__":
     unittest.main()
