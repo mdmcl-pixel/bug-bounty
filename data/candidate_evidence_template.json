@@ -9,6 +9,7 @@
   "control_test_passed": false,
   "duplicate_check_clear": false,
   "public_fix_check_clear": false,
+  "reference_commits": [],
   "local_reproduction": {
     "environment": "linux",
     "successful_runs": 0,
