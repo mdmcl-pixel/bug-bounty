@@ -13,13 +13,26 @@ concurrency:
   group: nvidia-linux-repro
   cancel-in-progress: true
 
+env:
+  NVIDIA_RELEASE: v1.20.0
+  NVIDIA_RELEASE_COMMIT: 5505e2f94d9aaa08561490db974ba3cd676af209
+
 jobs:
   repro:
     runs-on: ubuntu-latest
     timeout-minutes: 12
     steps:
       - name: Checkout released NVIDIA Container Toolkit
-        run: git clone --depth 1 --branch v1.20.0 https://github.com/NVIDIA/nvidia-container-toolkit.git nvidia-container-toolkit
+        run: git clone --depth 1 --branch "$NVIDIA_RELEASE" https://github.com/NVIDIA/nvidia-container-toolkit.git nvidia-container-toolkit
+
+      - name: Fail closed on release identity
+        working-directory: nvidia-container-toolkit
+        run: |
+          set -euo pipefail
+          actual="$(git rev-parse HEAD)"
+          test "$actual" = "$NVIDIA_RELEASE_COMMIT"
+          test -z "$(git status --porcelain)"
+          printf 'verified_release=%s\nverified_commit=%s\n' "$NVIDIA_RELEASE" "$actual"
 
       - uses: actions/setup-go@v6
         with:
@@ -37,20 +50,43 @@ jobs:
           go test ./internal/ldconfig
           go vet ./cmd/nvidia-cdi-hook/... ./internal/ldconfig/...
 
-      - name: Security-sensitive post-release diff triage
+      - name: Repeat critical boundary tests
+        working-directory: nvidia-container-toolkit
+        run: |
+          set -euo pipefail
+          go test -count=3 ./cmd/nvidia-cdi-hook/cudacompat
+          go test -count=3 ./cmd/nvidia-cdi-hook/create-symlinks
+          go test -count=3 ./cmd/nvidia-cdi-hook/disable-device-node-modification
+          go test -count=3 ./cmd/nvidia-cdi-hook/update-application-profile
+          go test -count=3 ./internal/ldconfig
+
+      - name: Reference-only post-release diff triage
         working-directory: nvidia-container-toolkit
         run: |
           set -euo pipefail
           git fetch origin main --depth=120
-          echo '=== security-sensitive changed paths ==='
-          git diff --name-only HEAD..FETCH_HEAD -- | grep -E '^(cmd/nvidia-cdi-hook/|internal/(ldconfig|modifier|oci)/|pkg/nvcdi/)' || true
-          echo '=== security-sensitive commits ==='
-          git log --oneline --no-merges HEAD..FETCH_HEAD -- cmd/nvidia-cdi-hook internal/ldconfig internal/modifier internal/oci pkg/nvcdi | sed -n '1,80p' || true
+          {
+            echo '### NVIDIA reference-only post-release triage'
+            echo
+            echo 'These diffs are public reference signals only; unreleased main is never bounty evidence.'
+            echo
+            echo '#### Security-sensitive changed paths'
+            echo '```'
+            git diff --name-only HEAD..FETCH_HEAD -- | grep -E '^(cmd/nvidia-cdi-hook/|internal/(ldconfig|modifier|oci)/|pkg/nvcdi/)' || true
+            echo '```'
+            echo '#### Security-sensitive commits'
+            echo '```'
+            git log --oneline --no-merges HEAD..FETCH_HEAD -- cmd/nvidia-cdi-hook internal/ldconfig internal/modifier internal/oci pkg/nvcdi | sed -n '1,80p' || true
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Truth marker
         run: |
           printf '%s\n' \
-            'release=v1.20.0' \
+            "release=$NVIDIA_RELEASE" \
+            "release_commit=$NVIDIA_RELEASE_COMMIT" \
             'environment=ubuntu-latest' \
             'scope=local-ci-only' \
-            'truth=baseline success and diff signals are not vulnerability proof'
+            'repeat_count=3' \
+            'submission_unlocked=false' \
+            'truth=baseline success and public diff signals are not vulnerability proof'
