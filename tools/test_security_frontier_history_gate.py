@@ -34,13 +34,20 @@ class FrontierHistoryGateTests(unittest.TestCase):
                     "finding": False,
                     "submission_ready": False,
                 },
+                {
+                    "path": "d.go",
+                    "classification": "DEPRIORITIZED_NO_PRIVILEGE_CROSSING_SHOWN",
+                    "reason": "container-local input changes container-local state only; no host privilege crossing shown",
+                    "finding": False,
+                    "submission_ready": False,
+                },
             ],
         }
 
     def test_valid_history_passes(self):
         out = validate(self.base())
         self.assertEqual(out["gate"], "PASS")
-        self.assertEqual(out["entries"], 3)
+        self.assertEqual(out["entries"], 4)
 
     def test_duplicate_path_fails(self):
         data = self.base()
@@ -69,6 +76,18 @@ class FrontierHistoryGateTests(unittest.TestCase):
     def test_no_attacker_control_reason_must_name_boundary(self):
         data = self.base()
         data["primary_deprioritized"][2]["reason"] = "not interesting"
+        with self.assertRaises(ValueError):
+            validate(data)
+
+    def test_no_privilege_crossing_requires_reason(self):
+        data = self.base()
+        data["primary_deprioritized"][3]["reason"] = ""
+        with self.assertRaises(ValueError):
+            validate(data)
+
+    def test_no_privilege_crossing_reason_must_name_boundary(self):
+        data = self.base()
+        data["primary_deprioritized"][3]["reason"] = "not interesting"
         with self.assertRaises(ValueError):
             validate(data)
 
