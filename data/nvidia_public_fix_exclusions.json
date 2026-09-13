@@ -6,23 +6,40 @@
     {
       "commit": "60691e995bd2d9bbc1bc671a4bd235f98543b1a5",
       "pattern": "root path component boundary transform",
-      "classification": "PUBLIC_FIX_EXCLUDE"
+      "classification": "PUBLIC_FIX_EXCLUDE",
+      "affected_files": [
+        "pkg/nvcdi/transform/root/root.go",
+        "pkg/nvcdi/transform/root/root_test.go"
+      ]
     },
     {
       "commit": "b5a4721daa18ec48fb3bcc2c9e04cbd6baff373a",
       "pattern": "WSL NVIDIA_VISIBLE_DEVICES none handling",
-      "classification": "PUBLIC_FIX_EXCLUDE"
+      "classification": "PUBLIC_FIX_EXCLUDE",
+      "affected_files": [
+        "pkg/nvcdi/lib-wsl.go"
+      ]
     },
     {
       "commit": "d854b3a0ec1c15a1808b13dc06476df87844dc79",
       "pattern": "malformed hook scratch directory names",
-      "classification": "PUBLIC_FIX_EXCLUDE"
+      "classification": "PUBLIC_FIX_EXCLUDE",
+      "affected_files": [
+        "cmd/nvidia-cdi-hook/disable-device-node-modification/params_linux.go",
+        "internal/ldconfig/ldconfig_linux.go"
+      ]
     },
     {
       "commit": "111337006bdb1268c6e5b05df8fa1136d51dd14f",
       "pattern": "update-ldcache sealed memfd and pseudo-filesystem masking",
-      "classification": "PUBLIC_FIX_EXCLUDE"
+      "classification": "PUBLIC_FIX_EXCLUDE",
+      "affected_files": [
+        "internal/ldconfig/ldconfig.go",
+        "internal/ldconfig/ldconfig_linux.go",
+        "internal/ldconfig/safe-exec_linux.go",
+        "internal/ldconfig/safe-exec_other.go"
+      ]
     }
   ],
-  "truth": "This registry prevents duplicate/public-fix promotion; it does not prove absence of adjacent vulnerabilities."
+  "truth": "This registry prevents duplicate/public-fix promotion while preserving adjacent-code review; it does not prove absence of adjacent vulnerabilities."
 }
