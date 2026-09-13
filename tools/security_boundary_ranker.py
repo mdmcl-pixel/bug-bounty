@@ -4,7 +4,8 @@
 This is a prioritizer, not a vulnerability detector. It focuses on implemented
 functions/methods crossing security-sensitive boundaries. Tests, fixtures,
 generated/non-Linux files and declaration/configuration-only files are removed
-before scoring. Public fixes remain reference-only exclusions.
+before scoring. Public fixes and wrappers that directly depend on public-fixed
+packages remain reference-only exclusions.
 """
 
 from __future__ import annotations
@@ -41,8 +42,10 @@ WEIGHTS = {
     "filepath.Join": 2, "filepath.Clean": 2, "Bundle": 2,
 }
 PUBLIC_FIX_PENALTY = 10
+PUBLIC_FIX_DEPENDENCY_PENALTY = 8
 ADJACENCY_BONUS = 5
 SOURCE_SINK_BONUS = 6
+MODULE_PREFIX = "github.com/NVIDIA/nvidia-container-toolkit/"
 
 
 def should_skip(rel: str) -> bool:
@@ -74,9 +77,10 @@ def load_exclusions(path: Path | None) -> dict:
     return data
 
 
-def exclusion_index(exclusions: dict) -> tuple[dict[str, list[str]], set[str]]:
+def exclusion_index(exclusions: dict) -> tuple[dict[str, list[str]], set[str], dict[str, list[str]]]:
     by_file: dict[str, list[str]] = {}
     fixed_dirs: set[str] = set()
+    by_import: dict[str, list[str]] = {}
     for item in exclusions.get("public_fixes", []):
         if not isinstance(item, dict) or item.get("classification") != "PUBLIC_FIX_EXCLUDE":
             continue
@@ -87,12 +91,15 @@ def exclusion_index(exclusions: dict) -> tuple[dict[str, list[str]], set[str]]:
                 continue
             if commit:
                 by_file.setdefault(rel, []).append(commit)
-            fixed_dirs.add(str(Path(rel).parent).replace("\\", "/"))
-    return by_file, fixed_dirs
+            parent = str(Path(rel).parent).replace("\\", "/")
+            fixed_dirs.add(parent)
+            if parent and parent != "." and commit:
+                by_import.setdefault(MODULE_PREFIX + parent, []).append(commit)
+    return by_file, fixed_dirs, by_import
 
 
 def rank(root: Path, limit: int = 20, exclusions: dict | None = None) -> list[dict]:
-    public_by_file, fixed_dirs = exclusion_index(exclusions or {})
+    public_by_file, fixed_dirs, public_by_import = exclusion_index(exclusions or {})
     ranked: list[dict] = []
     for path in root.rglob("*.go"):
         rel = path.relative_to(root).as_posix()
@@ -113,10 +120,30 @@ def rank(root: Path, limit: int = 20, exclusions: dict | None = None) -> list[di
         source_sink_bonus = SOURCE_SINK_BONUS if input_hits and sink_hits else 0
         public_refs = sorted(set(public_by_file.get(rel, [])))
         public_overlap = bool(public_refs)
+        dependency_refs = sorted({
+            commit
+            for import_path, commits in public_by_import.items()
+            if f'"{import_path}"' in text
+            for commit in commits
+        })
+        public_fix_dependency = bool(dependency_refs) and not public_overlap
         parent = str(Path(rel).parent).replace("\\", "/")
-        adjacency_bonus = ADJACENCY_BONUS if parent in fixed_dirs and not public_overlap else 0
-        penalty = PUBLIC_FIX_PENALTY if public_overlap else 0
+        adjacency_bonus = ADJACENCY_BONUS if parent in fixed_dirs and not public_overlap and not public_fix_dependency else 0
+        penalty = 0
+        if public_overlap:
+            penalty += PUBLIC_FIX_PENALTY
+        elif public_fix_dependency:
+            penalty += PUBLIC_FIX_DEPENDENCY_PENALTY
         priority_score = max(1, raw_score + adjacency_bonus + source_sink_bonus - penalty)
+        if public_overlap:
+            classification = "PUBLIC_FIX_OVERLAP_REFERENCE_ONLY"
+            next_step = "review_adjacent_behavior_only_do_not_resubmit_public_fix"
+        elif public_fix_dependency:
+            classification = "PUBLIC_FIX_DEPENDENCY_REFERENCE_ONLY"
+            next_step = "review_wrapper_only_if_independent_boundary_exists"
+        else:
+            classification = "UNVERIFIED_BOUNDARY_CANDIDATE"
+            next_step = "local_review_then_reproduction_if_concrete"
         ranked.append({
             "path": rel,
             "raw_score": raw_score,
@@ -127,13 +154,15 @@ def rank(root: Path, limit: int = 20, exclusions: dict | None = None) -> list[di
             "source_sink_bonus": source_sink_bonus,
             "public_fix_overlap": public_overlap,
             "public_fix_refs": public_refs,
+            "public_fix_dependency": public_fix_dependency,
+            "public_fix_dependency_refs": dependency_refs,
             "adjacency_bonus": adjacency_bonus,
             "finding": False,
             "submission_ready": False,
-            "classification": "PUBLIC_FIX_OVERLAP_REFERENCE_ONLY" if public_overlap else "UNVERIFIED_BOUNDARY_CANDIDATE",
-            "next": "review_adjacent_behavior_only_do_not_resubmit_public_fix" if public_overlap else "local_review_then_reproduction_if_concrete",
+            "classification": classification,
+            "next": next_step,
         })
-    ranked.sort(key=lambda item: (-item["score"], item["public_fix_overlap"], item["path"]))
+    ranked.sort(key=lambda item: (-item["score"], item["public_fix_overlap"], item["public_fix_dependency"], item["path"]))
     return ranked[:limit]
 
 
@@ -150,7 +179,7 @@ def main() -> int:
     except (ValueError, json.JSONDecodeError) as exc:
         raise SystemExit(str(exc)) from exc
     print(json.dumps({
-        "truth": "Linux implemented production-code ranking only; input-to-privileged-sink proximity is a prioritization signal, not proof of attacker control or vulnerability; configuration-only files are filtered unless they perform privileged operations; public fixes are reference-only",
+        "truth": "Linux implemented production-code ranking only; input-to-privileged-sink proximity is a prioritization signal, not proof of attacker control or vulnerability; configuration-only files are filtered unless they perform privileged operations; public fixes and direct package dependencies are reference-only",
         "candidates": rank(args.source_root, max(1, args.limit), exclusions),
     }, indent=2, sort_keys=True))
     return 0
