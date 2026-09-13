@@ -1,6 +1,6 @@
 {
-  "version": 3,
-  "updated_at": "2026-09-13T18:51:00Z",
+  "version": 4,
+  "updated_at": "2026-09-13T18:52:00Z",
   "program": "Proton Bug Bounty Program",
   "asset": "Proton Mail Bridge",
   "repository": "ProtonMail/proton-bridge",
@@ -9,35 +9,38 @@
   "evidence_run_id": 34775618343,
   "baseline": "PASS",
   "repeat_count": 3,
-  "impact_gate": "PARKED_IMPACT_NOT_PROVEN",
-  "impact_gate_status": "PASS_FAIL_CLOSED",
+  "impact_gate": "PASS_FAIL_CLOSED",
   "public_history_precheck": {
     "status": "PASS_NO_PUBLIC_MATCH_FOUND",
-    "code_search_match": false,
-    "issue_search_match": false,
-    "pull_request_search_match": false,
-    "toctou_issue_search_match": false,
-    "truth": "public repository history precheck only; private or non-public vulnerability reports are not visible, so duplicate_checked remains false"
-  },
-  "candidate": {
-    "id": "proton-bridge-post-verify-executable-target-swap",
-    "boundary": "signed update verification to executable launch",
-    "status": "REPRODUCED_X3_IMPACT_GATE_LOCKED",
-    "reproduced": true,
-    "scope_verified": true,
-    "public_history_checked": true,
     "duplicate_checked": false,
-    "security_boundary_crossed": false,
-    "attacker_capability_gain_proven": false,
-    "requires_existing_local_write_access": true,
-    "behavior": "a valid signed update can pass VerifyFiles; if the executable path is replaced after verification with a symlink, GetExecutable accepts the symlink path without re-verifying the target",
-    "truth": "released local behavior reproduced three times; promotion remains blocked until an in-scope security boundary and attacker capability gain are independently proven"
+    "truth": "public repository history precheck only; private or non-public vulnerability reports are not visible"
   },
-  "next": [
-    "prove or reject attacker capability gain beyond existing local write/code-execution privilege",
-    "rotate to local IMAP/SMTP auth or keychain boundary if impact remains unproven",
-    "perform platform duplicate check only if evidence becomes submission-grade"
+  "completed_candidates": [
+    {
+      "id": "proton-bridge-post-verify-executable-target-swap",
+      "boundary": "signed update verification to executable launch",
+      "status": "PARKED_NO_CAPABILITY_GAIN_PROVEN",
+      "reproduced": true,
+      "repeat_result": "PASS_X3",
+      "security_boundary_crossed": false,
+      "attacker_capability_gain_proven": false,
+      "requires_existing_local_write_access": true,
+      "reason": "released update storage is per-user and mode 0700; no launcher elevation was demonstrated; the launched process inherits the same-user environment and platform credential access remains a separate boundary, so the reproduced target swap does not currently show capability beyond existing same-user arbitrary write/code execution",
+      "finding": false,
+      "submission_ready": false
+    }
   ],
+  "current_frontier": {
+    "id": "proton-bridge-local-mail-auth",
+    "boundary": "local IMAP/SMTP authentication",
+    "status": "PRIMARY_SOURCE_REVIEW",
+    "focus": [
+      "credential comparison and identity mapping",
+      "empty or partial credential rejection",
+      "listener exposure and TLS/auth policy",
+      "stale-session or wrong-user authentication state"
+    ]
+  },
   "finding": false,
   "submission_ready": false,
   "owner_action_required": false
