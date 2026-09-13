@@ -1,0 +1,19 @@
+{
+  "target": "",
+  "release": "",
+  "submission_unlocked": false,
+  "in_scope": false,
+  "released_code_only": false,
+  "meaningful_security_impact": false,
+  "realistic_attack_scenario": false,
+  "control_test_passed": false,
+  "duplicate_check_clear": false,
+  "public_fix_check_clear": false,
+  "local_reproduction": {
+    "environment": "linux",
+    "successful_runs": 0,
+    "deterministic": false
+  },
+  "confirmed_finding": false,
+  "notes": "Fail closed. Populate only from verified evidence; never use this template as proof."
+}
