@@ -48,13 +48,20 @@ class FrontierHistoryGateTests(unittest.TestCase):
                     "finding": False,
                     "submission_ready": False,
                 },
+                {
+                    "path": "f.go",
+                    "classification": "DEPRIORITIZED_HOST_CONFIGURATION_ONLY",
+                    "reason": "host/operator configuration supplies the path; no container-controlled input is shown",
+                    "finding": False,
+                    "submission_ready": False,
+                },
             ],
         }
 
     def test_valid_history_passes(self):
         out = validate(self.base())
         self.assertEqual(out["gate"], "PASS")
-        self.assertEqual(out["entries"], 5)
+        self.assertEqual(out["entries"], 6)
 
     def test_duplicate_path_fails(self):
         data = self.base()
@@ -107,6 +114,12 @@ class FrontierHistoryGateTests(unittest.TestCase):
     def test_disabled_by_default_requires_enablement_condition(self):
         data = self.base()
         data["primary_deprioritized"][4]["reason"] = "hook is disabled by default"
+        with self.assertRaises(ValueError):
+            validate(data)
+
+    def test_host_configuration_only_requires_boundary_reason(self):
+        data = self.base()
+        data["primary_deprioritized"][5]["reason"] = "configuration path"
         with self.assertRaises(ValueError):
             validate(data)
 
