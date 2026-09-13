@@ -1,0 +1,47 @@
+{
+  "version": 1,
+  "updated_at": "2026-09-13T18:38:00Z",
+  "rules": [
+    "AUTHORIZED_OR_PUBLIC_BUG_BOUNTY_ONLY",
+    "LOCAL_OR_SOURCE_REVIEW_FIRST",
+    "ZERO_OWNER_SPEND",
+    "NO_PRODUCTION_ATTACKS",
+    "REPRODUCIBLE_IMPACT_BEFORE_FINDING",
+    "NO_SPECULATIVE_SUBMISSIONS"
+  ],
+  "targets": [
+    {
+      "id": "proton-mail-bridge",
+      "program": "Proton Bug Bounty Program",
+      "asset": "Proton Mail Bridge",
+      "repository": "ProtonMail/proton-bridge",
+      "status": "READY",
+      "priority": 100,
+      "reward_max_usd": 100000,
+      "review_mode": "LOCAL_SOURCE_ONLY",
+      "focus": [
+        "secure-update-and-signature-boundary",
+        "local-imap-smtp-auth-boundary",
+        "credential-and-keychain-protection",
+        "local-privilege-boundaries"
+      ],
+      "verified_at": "2026-09-13T18:38:00Z"
+    },
+    {
+      "id": "nvidia-container-toolkit-v1.20.0",
+      "program": "NVIDIA Public Bug Bounty",
+      "asset": "NVIDIA Container Toolkit v1.20.0 CDI architecture",
+      "repository": "NVIDIA/nvidia-container-toolkit",
+      "status": "RANKED_FRONTIER_EXHAUSTED",
+      "priority": 90,
+      "review_mode": "LOCAL_SOURCE_ONLY",
+      "history_entries": 22,
+      "finding": false,
+      "submission_ready": false,
+      "truth": "current ranked frontier exhausted under the present search model; this does not prove absence of vulnerabilities"
+    }
+  ],
+  "confirmed_findings": 0,
+  "submitted_findings": 0,
+  "settled_earnings_gbp": 0
+}
