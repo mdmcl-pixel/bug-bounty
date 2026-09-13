@@ -4,9 +4,10 @@
 This is a prioritizer, not a vulnerability detector. It focuses on implemented
 functions/methods crossing security-sensitive boundaries. Tests, fixtures,
 generated/non-Linux files and declaration/configuration-only files are removed
-before scoring. Public fixes and wrappers that directly depend on public-fixed
-packages remain reference-only exclusions. Host/operator configuration-only
-paths are down-ranked when no container/input proximity signal is present.
+before scoring. Public fixes, explicit dependent files, and wrappers that
+directly depend on public-fixed packages remain reference-only exclusions.
+Host/operator configuration-only paths are down-ranked when no container/input
+proximity signal is present.
 """
 
 from __future__ import annotations
@@ -84,10 +85,11 @@ def load_exclusions(path: Path | None) -> dict:
     return data
 
 
-def exclusion_index(exclusions: dict) -> tuple[dict[str, list[str]], set[str], dict[str, list[str]]]:
+def exclusion_index(exclusions: dict) -> tuple[dict[str, list[str]], set[str], dict[str, list[str]], dict[str, list[str]]]:
     by_file: dict[str, list[str]] = {}
     fixed_dirs: set[str] = set()
     by_import: dict[str, list[str]] = {}
+    dependent_by_file: dict[str, list[str]] = {}
     for item in exclusions.get("public_fixes", []):
         if not isinstance(item, dict) or item.get("classification") != "PUBLIC_FIX_EXCLUDE":
             continue
@@ -102,11 +104,15 @@ def exclusion_index(exclusions: dict) -> tuple[dict[str, list[str]], set[str], d
             fixed_dirs.add(parent)
             if parent and parent != "." and commit:
                 by_import.setdefault(MODULE_PREFIX + parent, []).append(commit)
-    return by_file, fixed_dirs, by_import
+        for raw_path in item.get("dependent_files", []):
+            rel = str(raw_path).strip().replace("\\", "/")
+            if rel and commit:
+                dependent_by_file.setdefault(rel, []).append(commit)
+    return by_file, fixed_dirs, by_import, dependent_by_file
 
 
 def rank(root: Path, limit: int = 20, exclusions: dict | None = None) -> list[dict]:
-    public_by_file, fixed_dirs, public_by_import = exclusion_index(exclusions or {})
+    public_by_file, fixed_dirs, public_by_import, dependent_by_file = exclusion_index(exclusions or {})
     ranked: list[dict] = []
     for path in root.rglob("*.go"):
         rel = path.relative_to(root).as_posix()
@@ -130,10 +136,13 @@ def rank(root: Path, limit: int = 20, exclusions: dict | None = None) -> list[di
         public_refs = sorted(set(public_by_file.get(rel, [])))
         public_overlap = bool(public_refs)
         dependency_refs = sorted({
-            commit
-            for import_path, commits in public_by_import.items()
-            if f'"{import_path}"' in text
-            for commit in commits
+            *dependent_by_file.get(rel, []),
+            *(
+                commit
+                for import_path, commits in public_by_import.items()
+                if f'"{import_path}"' in text
+                for commit in commits
+            ),
         })
         public_fix_dependency = bool(dependency_refs) and not public_overlap
         parent = str(Path(rel).parent).replace("\\", "/")
@@ -191,7 +200,7 @@ def main() -> int:
     except (ValueError, json.JSONDecodeError) as exc:
         raise SystemExit(str(exc)) from exc
     print(json.dumps({
-        "truth": "Linux implemented production-code ranking only; input-to-privileged-sink proximity is a prioritization signal, not proof of attacker control or vulnerability; configuration-only files are filtered unless they perform privileged operations; host/operator configuration-only paths are down-ranked; public fixes and direct package dependencies are reference-only",
+        "truth": "Linux implemented production-code ranking only; input-to-privileged-sink proximity is a prioritization signal, not proof of attacker control or vulnerability; configuration-only files are filtered unless they perform privileged operations; host/operator configuration-only paths are down-ranked; public fixes, explicit dependent files, and direct package dependencies are reference-only",
         "candidates": rank(args.source_root, max(1, args.limit), exclusions),
     }, indent=2, sort_keys=True))
     return 0
