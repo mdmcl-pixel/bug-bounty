@@ -1,6 +1,7 @@
 {
   "target": "NVIDIA/nvidia-container-toolkit",
   "release": "v1.20.0",
+  "release_commit": "5505e2f94d9aaa08561490db974ba3cd676af209",
   "purpose": "Public post-release fixes are reference signals only and must not be promoted as original bounty findings.",
   "public_fixes": [
     {
