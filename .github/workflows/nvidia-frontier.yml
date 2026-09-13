@@ -1,0 +1,79 @@
+name: NVIDIA Frontier
+
+on:
+  push:
+    paths:
+      - '.github/workflows/nvidia-frontier.yml'
+      - 'tools/security_frontier_selector.py'
+      - 'tools/test_security_frontier_selector.py'
+      - 'tools/security_boundary_ranker.py'
+      - 'data/nvidia_public_fix_exclusions.json'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: nvidia-frontier
+  cancel-in-progress: true
+
+env:
+  NVIDIA_RELEASE: v1.20.0
+  NVIDIA_RELEASE_COMMIT: 5505e2f94d9aaa08561490db974ba3cd676af209
+
+jobs:
+  frontier:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v5
+      - name: Test selector
+        run: python -m unittest tools/test_security_frontier_selector.py
+      - name: Checkout exact released source
+        run: git clone --depth 1 --branch "$NVIDIA_RELEASE" https://github.com/NVIDIA/nvidia-container-toolkit.git nvidia-container-toolkit
+      - name: Verify release identity
+        working-directory: nvidia-container-toolkit
+        run: test "$(git rev-parse HEAD)" = "$NVIDIA_RELEASE_COMMIT"
+      - name: Build ranking and frontier
+        run: |
+          set -euo pipefail
+          python tools/security_boundary_ranker.py nvidia-container-toolkit --limit 40 --exclusions data/nvidia_public_fix_exclusions.json > boundary-ranking.json
+          python tools/security_frontier_selector.py boundary-ranking.json > frontier.json
+          python - <<'PY'
+          import json
+          d=json.load(open('frontier.json', encoding='utf-8'))
+          c=d['candidate']
+          print(f"frontier={c['path']} score={c['score']} finding={d['finding']}")
+          assert d['finding'] is False and d['submission_ready'] is False
+          assert c['public_fix_overlap'] is False
+          PY
+      - uses: actions/setup-go@v6
+        with:
+          go-version: '1.25.x'
+          cache: false
+      - name: Repeat-test frontier package
+        run: |
+          set -euo pipefail
+          pkg="$(python - <<'PY'
+          import json, pathlib
+          p=json.load(open('frontier.json', encoding='utf-8'))['candidate']['path']
+          print(pathlib.PurePosixPath(p).parent.as_posix())
+          PY
+          )"
+          cd nvidia-container-toolkit
+          go test -count=3 "./$pkg"
+      - name: Preserve evidence artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: nvidia-frontier-evidence
+          path: |
+            boundary-ranking.json
+            frontier.json
+          retention-days: 7
+      - name: Truth marker
+        run: |
+          echo 'scope=released-v1.20.0-local-ci-only'
+          echo 'frontier=untouched-non-test-released-code'
+          echo 'repeat_count=3'
+          echo 'finding=false'
+          echo 'submission_unlocked=false'
