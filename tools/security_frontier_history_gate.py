@@ -14,6 +14,7 @@ from pathlib import Path
 ALLOWED = {
     "TESTED_ESCAPE_HYPOTHESIS_REJECTED",
     "PUBLIC_FIX_DEPENDENCY_REFERENCE_ONLY",
+    "DEPRIORITIZED_NO_ATTACKER_CONTROL_SHOWN",
 }
 
 
@@ -46,6 +47,12 @@ def validate(data: dict) -> dict:
                 raise ValueError("tested-hypothesis entry lacks evidence identity")
         if classification == "PUBLIC_FIX_DEPENDENCY_REFERENCE_ONLY" and not item.get("reason"):
             raise ValueError("public-fix dependency entry lacks reason")
+        if classification == "DEPRIORITIZED_NO_ATTACKER_CONTROL_SHOWN":
+            reason = str(item.get("reason", "")).strip()
+            if not reason:
+                raise ValueError("no-attacker-control entry lacks reason")
+            if "attacker" not in reason.lower() and "container-controlled" not in reason.lower():
+                raise ValueError("no-attacker-control reason must identify the missing attacker-controlled boundary")
 
     return {
         "gate": "PASS",
