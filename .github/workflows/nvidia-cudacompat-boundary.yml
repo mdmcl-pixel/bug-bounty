@@ -1,0 +1,70 @@
+name: NVIDIA CUDA Compat Boundary
+
+on:
+  push:
+    paths:
+      - '.github/workflows/nvidia-cudacompat-boundary.yml'
+      - 'fixtures/nvidia/cudacompat_boundary_test.go'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: nvidia-cudacompat-boundary
+  cancel-in-progress: true
+
+env:
+  NVIDIA_RELEASE: v1.20.0
+  NVIDIA_RELEASE_COMMIT: 5505e2f94d9aaa08561490db974ba3cd676af209
+
+jobs:
+  boundary:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout audit harness
+        uses: actions/checkout@v5
+
+      - name: Checkout exact released NVIDIA source
+        run: git clone --depth 1 --branch "$NVIDIA_RELEASE" https://github.com/NVIDIA/nvidia-container-toolkit.git nvidia-container-toolkit
+
+      - name: Fail closed on release identity
+        working-directory: nvidia-container-toolkit
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$NVIDIA_RELEASE_COMMIT"
+          test -z "$(git status --porcelain)"
+
+      - uses: actions/setup-go@v6
+        with:
+          go-version: '1.25.x'
+          cache: false
+
+      - name: Inject isolated boundary controls
+        run: |
+          set -euo pipefail
+          cp fixtures/nvidia/cudacompat_boundary_test.go nvidia-container-toolkit/cmd/nvidia-cdi-hook/cudacompat/daisy_boundary_test.go
+
+      - name: Run host-boundary controls three times
+        working-directory: nvidia-container-toolkit
+        run: |
+          set -euo pipefail
+          go test -count=3 -run '^TestDaisyCudacompatBoundary_' ./cmd/nvidia-cdi-hook/cudacompat
+
+      - name: Run upstream package regression
+        working-directory: nvidia-container-toolkit
+        run: |
+          set -euo pipefail
+          go test ./cmd/nvidia-cdi-hook/cudacompat
+
+      - name: Truth marker
+        run: |
+          printf '%s\n' \
+            'scope=released-v1.20.0-local-ci-only' \
+            'candidate=cmd/nvidia-cdi-hook/cudacompat/cudacompat.go' \
+            'controls=host-outside-read-glob-write-boundaries' \
+            'repeat_count=3' \
+            'finding=false' \
+            'submission_unlocked=false' \
+            'truth=passing containment controls reject this tested escape hypothesis; they do not prove absence of other vulnerabilities'
