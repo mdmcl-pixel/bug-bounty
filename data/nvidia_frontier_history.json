@@ -45,6 +45,13 @@
       "remaining_review": ["revisit if a released path shows container-controlled link arguments reaching this hook"]
     },
     {
+      "path": "cmd/nvidia-cdi-hook/disable-device-node-modification/disable-device-node-modification.go",
+      "classification": "PUBLIC_FIX_DEPENDENCY_REFERENCE_ONLY",
+      "reason": "the privileged filesystem/mount implementation is in params_linux.go, which is already covered by public fix d854b3a0ec1c15a1808b13dc06476df87844dc79; container-root control through OCI state does not independently establish an in-scope privilege crossing",
+      "finding": false,
+      "submission_ready": false
+    },
+    {
       "path": "cmd/nvidia-cdi-hook/update-application-profile/update-application-profile.go",
       "classification": "TESTED_ESCAPE_HYPOTHESIS_REJECTED",
       "tested_hypothesis": "application-profile host-outside write escape through a container-root symlink",
