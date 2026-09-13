@@ -37,7 +37,11 @@ func TestDaisyUpdateApplicationProfileBoundary_SymlinkCannotWriteHostOutside(t *
 
 func TestDaisyUpdateApplicationProfileBoundary_NormalInRootWriteWorks(t *testing.T) {
     containerRootDir := t.TempDir()
-    if err := os.MkdirAll(filepath.Join(containerRootDir, "etc", "nvidia"), 0755); err != nil {
+
+    // This positive control intentionally pre-creates the destination directory
+    // writable by the unprivileged CI user. The security property under test is
+    // os.Root path containment, not the hook's runtime privilege level.
+    if err := os.MkdirAll(filepath.Join(containerRootDir, applicationProfileDir), 0755); err != nil {
         t.Fatal(err)
     }
 
@@ -47,9 +51,6 @@ func TestDaisyUpdateApplicationProfileBoundary_NormalInRootWriteWorks(t *testing
     }
     defer root.Close()
 
-    if err := root.MkdirAll(applicationProfileDir, 0555); err != nil {
-        t.Fatal(err)
-    }
     expected := []byte("profile")
     if err := root.WriteFile(applicationProfileFile, expected, 0444); err != nil {
         t.Fatal(err)
