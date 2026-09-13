@@ -6,6 +6,9 @@ on:
       - '.github/workflows/nvidia-linux-repro.yml'
       - 'tools/security_evidence_gate.py'
       - 'tools/test_security_evidence_gate.py'
+      - 'tools/security_boundary_ranker.py'
+      - 'tools/test_security_boundary_ranker.py'
+      - 'data/nvidia_public_fix_exclusions.json'
   workflow_dispatch:
 
 permissions:
@@ -27,8 +30,22 @@ jobs:
       - name: Checkout audit harness
         uses: actions/checkout@v5
 
-      - name: Verify fail-closed evidence gate
-        run: python -m unittest tools/test_security_evidence_gate.py
+      - name: Verify fail-closed research gates
+        run: |
+          set -euo pipefail
+          python -m unittest tools/test_security_evidence_gate.py tools/test_security_boundary_ranker.py
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          p = Path('data/nvidia_public_fix_exclusions.json')
+          d = json.loads(p.read_text(encoding='utf-8'))
+          assert d['target'] == 'NVIDIA/nvidia-container-toolkit'
+          assert d['release'] == 'v1.20.0'
+          fixes = d.get('public_fixes', [])
+          assert len(fixes) >= 4
+          assert all(x.get('classification') == 'PUBLIC_FIX_EXCLUDE' for x in fixes)
+          assert len({x['commit'] for x in fixes}) == len(fixes)
+          PY
 
       - name: Checkout released NVIDIA Container Toolkit
         run: git clone --depth 1 --branch "$NVIDIA_RELEASE" https://github.com/NVIDIA/nvidia-container-toolkit.git nvidia-container-toolkit
@@ -68,6 +85,21 @@ jobs:
           go test -count=3 ./cmd/nvidia-cdi-hook/update-application-profile
           go test -count=3 ./internal/ldconfig
 
+      - name: Rank released security boundaries
+        run: |
+          set -euo pipefail
+          python tools/security_boundary_ranker.py nvidia-container-toolkit --limit 20 > boundary-ranking.json
+          python - <<'PY' >> "$GITHUB_STEP_SUMMARY"
+          import json
+          d=json.load(open('boundary-ranking.json', encoding='utf-8'))
+          print('### Released v1.20.0 security-boundary ranking')
+          print()
+          print('Ranking only; no vulnerability proof.')
+          print()
+          for i, item in enumerate(d['candidates'][:20], 1):
+              print(f"{i}. `{item['path']}` — score {item['score']}")
+          PY
+
       - name: Reference-only post-release diff triage
         working-directory: nvidia-container-toolkit
         run: |
@@ -97,5 +129,7 @@ jobs:
             'scope=local-ci-only' \
             'repeat_count=3' \
             'evidence_gate=fail-closed' \
+            'public_fix_exclusion=enabled' \
+            'boundary_ranker=ranking-only' \
             'submission_unlocked=false' \
-            'truth=baseline success and public diff signals are not vulnerability proof'
+            'truth=baseline success, ranking, and public diff signals are not vulnerability proof'
