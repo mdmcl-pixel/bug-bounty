@@ -1,0 +1,23 @@
+{
+  "target": "NVIDIA/nvidia-container-toolkit",
+  "release": "v1.20.0",
+  "release_commit": "5505e2f94d9aaa08561490db974ba3cd676af209",
+  "primary_deprioritized": [
+    {
+      "path": "cmd/nvidia-cdi-hook/cudacompat/cudacompat.go",
+      "classification": "TESTED_ESCAPE_HYPOTHESIS_REJECTED",
+      "tested_hypothesis": "container-root host-outside read/glob/write escape through symlinks",
+      "evidence_run_id": 34769266501,
+      "repeat_count": 3,
+      "result": "PASS_CONTAINMENT",
+      "finding": false,
+      "submission_ready": false,
+      "remaining_review": [
+        "ELF and version-selection trust logic",
+        "state-to-hook input trust boundary",
+        "non-escape logic flaws"
+      ]
+    }
+  ],
+  "truth": "Deprioritization only rotates primary review after a tested hypothesis is rejected; it does not declare a file vulnerability-free."
+}
