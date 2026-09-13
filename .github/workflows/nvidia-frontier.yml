@@ -10,6 +10,9 @@ on:
       - 'tools/test_security_frontier_history_gate.py'
       - 'tools/security_boundary_ranker.py'
       - 'tools/test_security_boundary_ranker.py'
+      - 'tools/high_value_target_selector.py'
+      - 'tools/test_high_value_target_selector.py'
+      - 'data/high_value_target_queue.json'
       - 'data/nvidia_public_fix_exclusions.json'
       - 'data/nvidia_frontier_history.json'
   workflow_dispatch:
@@ -31,14 +34,28 @@ jobs:
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v5
-      - name: Verify ranker, selector and history gates
+      - name: Verify ranker, selector, history and target rotation gates
         run: |
           set -euo pipefail
           python -m unittest \
             tools/test_security_boundary_ranker.py \
             tools/test_security_frontier_selector.py \
-            tools/test_security_frontier_history_gate.py
+            tools/test_security_frontier_history_gate.py \
+            tools/test_high_value_target_selector.py
           python tools/security_frontier_history_gate.py data/nvidia_frontier_history.json
+          python tools/high_value_target_selector.py data/high_value_target_queue.json > target-selection.json
+          python - <<'PY'
+          import json
+          d=json.load(open('target-selection.json', encoding='utf-8'))
+          assert d['finding'] is False and d['submission_ready'] is False
+          assert d['owner_action_required'] is False
+          if d['status'] == 'ACTIVE':
+              assert d['target'] is not None
+              print(f"next_target={d['target']['id']} priority={d['target']['priority']}")
+          else:
+              assert d['target'] is None
+              print('next_target=EXHAUSTED')
+          PY
       - name: Checkout exact released source
         run: git clone --depth 1 --branch "$NVIDIA_RELEASE" https://github.com/NVIDIA/nvidia-container-toolkit.git nvidia-container-toolkit
       - name: Verify release identity
@@ -90,6 +107,7 @@ jobs:
           path: |
             boundary-ranking.json
             frontier.json
+            target-selection.json
           retention-days: 7
       - name: Truth marker
         run: |
@@ -97,6 +115,7 @@ jobs:
           echo 'frontier=rotating-untouched-linux-production-code'
           echo 'history_gate=fail-closed'
           echo 'ranker_gate=fail-closed'
+          echo 'target_rotation_gate=fail-closed'
           echo 'history=tested-hypotheses-deprioritized-not-declared-safe'
           echo "frontier_exhausted=${{ steps.select.outputs.exhausted }}"
           echo 'finding=false'
