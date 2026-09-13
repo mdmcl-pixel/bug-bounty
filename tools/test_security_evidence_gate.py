@@ -32,6 +32,7 @@ class EvidenceGateTests(unittest.TestCase):
         return {
             "target": "example/target",
             "release": "v1.0.0",
+            "release_commit": "release-sha-123",
             "submission_unlocked": False,
             "in_scope": True,
             "released_code_only": True,
@@ -53,6 +54,7 @@ class EvidenceGateTests(unittest.TestCase):
         return {
             "target": "example/target",
             "release": "v1.0.0",
+            "release_commit": "release-sha-123",
             "public_fixes": [
                 {
                     "commit": "public-fix-123",
@@ -98,6 +100,20 @@ class EvidenceGateTests(unittest.TestCase):
         result = self.run_gate(self.valid_candidate(), registry)
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("registry release mismatch", result.stdout)
+
+    def test_release_commit_mismatch_fails_closed(self):
+        candidate = self.valid_candidate()
+        candidate["release_commit"] = "wrong-sha"
+        result = self.run_gate(candidate, self.registry())
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("release commit mismatch", result.stdout)
+
+    def test_missing_release_commit_fails_closed(self):
+        candidate = self.valid_candidate()
+        candidate.pop("release_commit")
+        result = self.run_gate(candidate, self.registry())
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("identity missing", result.stdout)
 
 
 if __name__ == "__main__":
