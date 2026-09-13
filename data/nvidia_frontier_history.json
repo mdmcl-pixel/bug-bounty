@@ -46,6 +46,21 @@
       ]
     },
     {
+      "path": "cmd/nvidia-cdi-hook/update-application-profile/update-application-profile.go",
+      "classification": "TESTED_ESCAPE_HYPOTHESIS_REJECTED",
+      "tested_hypothesis": "application-profile host-outside write escape through a container-root symlink",
+      "evidence_run_id": 34770512384,
+      "repeat_count": 3,
+      "result": "PASS_CONTAINMENT",
+      "finding": false,
+      "submission_ready": false,
+      "remaining_review": [
+        "device-minor selection trust logic",
+        "OCI state to container-root trust boundary",
+        "non-escape logic flaws"
+      ]
+    },
+    {
       "path": "pkg/nvcdi/transform/root/container-root.go",
       "classification": "PUBLIC_FIX_DEPENDENCY_REFERENCE_ONLY",
       "reason": "delegates path transformation to pkg/nvcdi/transform/root/root.go, which is covered by public fix 60691e995bd2d9bbc1bc671a4bd235f98543b1a5",
