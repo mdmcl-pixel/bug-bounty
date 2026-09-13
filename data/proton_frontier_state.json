@@ -1,6 +1,6 @@
 {
-  "version": 2,
-  "updated_at": "2026-09-13T18:48:00Z",
+  "version": 3,
+  "updated_at": "2026-09-13T18:51:00Z",
   "program": "Proton Bug Bounty Program",
   "asset": "Proton Mail Bridge",
   "repository": "ProtonMail/proton-bridge",
@@ -11,12 +11,21 @@
   "repeat_count": 3,
   "impact_gate": "PARKED_IMPACT_NOT_PROVEN",
   "impact_gate_status": "PASS_FAIL_CLOSED",
+  "public_history_precheck": {
+    "status": "PASS_NO_PUBLIC_MATCH_FOUND",
+    "code_search_match": false,
+    "issue_search_match": false,
+    "pull_request_search_match": false,
+    "toctou_issue_search_match": false,
+    "truth": "public repository history precheck only; private or non-public vulnerability reports are not visible, so duplicate_checked remains false"
+  },
   "candidate": {
     "id": "proton-bridge-post-verify-executable-target-swap",
     "boundary": "signed update verification to executable launch",
     "status": "REPRODUCED_X3_IMPACT_GATE_LOCKED",
     "reproduced": true,
     "scope_verified": true,
+    "public_history_checked": true,
     "duplicate_checked": false,
     "security_boundary_crossed": false,
     "attacker_capability_gain_proven": false,
@@ -26,8 +35,8 @@
   },
   "next": [
     "prove or reject attacker capability gain beyond existing local write/code-execution privilege",
-    "check public history and known reports before any promotion",
-    "rotate to local IMAP/SMTP auth or keychain boundary if impact remains unproven"
+    "rotate to local IMAP/SMTP auth or keychain boundary if impact remains unproven",
+    "perform platform duplicate check only if evidence becomes submission-grade"
   ],
   "finding": false,
   "submission_ready": false,
