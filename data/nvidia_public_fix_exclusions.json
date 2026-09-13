@@ -11,6 +11,11 @@
       "affected_files": [
         "pkg/nvcdi/transform/root/root.go",
         "pkg/nvcdi/transform/root/root_test.go"
+      ],
+      "dependent_files": [
+        "pkg/nvcdi/transform/root/builder.go",
+        "pkg/nvcdi/transform/root/container-root.go",
+        "pkg/nvcdi/transform/root/driver-root.go"
       ]
     },
     {
@@ -42,5 +47,5 @@
       ]
     }
   ],
-  "truth": "This registry prevents duplicate/public-fix promotion while preserving adjacent-code review; it does not prove absence of adjacent vulnerabilities."
+  "truth": "This registry prevents duplicate/public-fix promotion, can mark explicit dependent files reference-only, and preserves adjacent-code review; it does not prove absence of adjacent vulnerabilities."
 }
