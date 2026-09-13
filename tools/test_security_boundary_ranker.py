@@ -46,20 +46,32 @@ class BoundaryRankerTests(unittest.TestCase):
             adjacent = d / "adjacent.go"
             known.write_text("package x\n// unix.Mount os.OpenRoot filepath.Join", encoding="utf-8")
             adjacent.write_text("package x\n// unix.Mount os.OpenRoot filepath.Join", encoding="utf-8")
-            exclusions = {
-                "public_fixes": [{
-                    "commit": "abc123",
-                    "classification": "PUBLIC_FIX_EXCLUDE",
-                    "affected_files": ["internal/ldconfig/known.go"],
-                }]
-            }
+            exclusions = {"public_fixes": [{
+                "commit": "abc123",
+                "classification": "PUBLIC_FIX_EXCLUDE",
+                "affected_files": ["internal/ldconfig/known.go"],
+            }]}
             out = rank(root, exclusions=exclusions)
             self.assertEqual(out[0]["path"], "internal/ldconfig/adjacent.go")
             self.assertEqual(out[0]["adjacency_bonus"], 5)
             known_item = next(x for x in out if x["path"].endswith("known.go"))
             self.assertTrue(known_item["public_fix_overlap"])
             self.assertEqual(known_item["public_fix_refs"], ["abc123"])
-            self.assertEqual(known_item["classification"], "PUBLIC_FIX_ADJACENT_REVIEW_ONLY")
+            self.assertEqual(known_item["classification"], "PUBLIC_FIX_OVERLAP_REFERENCE_ONLY")
+
+    def test_test_fixture_and_generated_sources_are_removed_before_scoring(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            d = root / "cmd" / "nvidia-cdi-hook" / "cudacompat"
+            d.mkdir(parents=True)
+            (d / "real.go").write_text("package x\n// filepath.Join containerRoot", encoding="utf-8")
+            (d / "loud_test.go").write_text("package x\n// pivot_root execve unix.Mount Symlink Symlink", encoding="utf-8")
+            (d / "zz_generated.go").write_text("package x\n// pivot_root execve unix.Mount", encoding="utf-8")
+            fixture = d / "testdata" / "fixture.go"
+            fixture.parent.mkdir(parents=True)
+            fixture.write_text("package x\n// pivot_root execve unix.Mount", encoding="utf-8")
+            out = rank(root)
+            self.assertEqual([x["path"] for x in out], ["cmd/nvidia-cdi-hook/cudacompat/real.go"])
 
 
 if __name__ == "__main__":
