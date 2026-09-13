@@ -44,6 +44,7 @@ jobs:
           fixes = d.get('public_fixes', [])
           assert len(fixes) >= 4
           assert all(x.get('classification') == 'PUBLIC_FIX_EXCLUDE' for x in fixes)
+          assert all(isinstance(x.get('affected_files'), list) and x['affected_files'] for x in fixes)
           assert len({x['commit'] for x in fixes}) == len(fixes)
           PY
 
@@ -85,19 +86,23 @@ jobs:
           go test -count=3 ./cmd/nvidia-cdi-hook/update-application-profile
           go test -count=3 ./internal/ldconfig
 
-      - name: Rank released security boundaries
+      - name: Rank adjacent released security boundaries
         run: |
           set -euo pipefail
-          python tools/security_boundary_ranker.py nvidia-container-toolkit --limit 20 > boundary-ranking.json
+          python tools/security_boundary_ranker.py nvidia-container-toolkit \
+            --limit 20 \
+            --exclusions data/nvidia_public_fix_exclusions.json \
+            > boundary-ranking.json
           python - <<'PY' >> "$GITHUB_STEP_SUMMARY"
           import json
           d=json.load(open('boundary-ranking.json', encoding='utf-8'))
-          print('### Released v1.20.0 security-boundary ranking')
+          print('### Released v1.20.0 adjacent security-boundary ranking')
           print()
-          print('Ranking only; no vulnerability proof.')
+          print('Ranking only; public fixes are reference-only; no vulnerability proof.')
           print()
           for i, item in enumerate(d['candidates'][:20], 1):
-              print(f"{i}. `{item['path']}` — score {item['score']}")
+              marker = ' public-fix-overlap' if item['public_fix_overlap'] else ''
+              print(f"{i}. `{item['path']}` — priority {item['score']} — {item['classification']}{marker}")
           PY
 
       - name: Reference-only post-release diff triage
@@ -129,7 +134,8 @@ jobs:
             'scope=local-ci-only' \
             'repeat_count=3' \
             'evidence_gate=fail-closed' \
-            'public_fix_exclusion=enabled' \
+            'public_fix_exclusion=file-aware' \
+            'adjacent_boundary_search=enabled' \
             'boundary_ranker=ranking-only' \
             'submission_unlocked=false' \
             'truth=baseline success, ranking, and public diff signals are not vulnerability proof'
