@@ -19,6 +19,19 @@
       ]
     },
     {
+      "path": "cmd/nvidia-cdi-hook/cudacompat/container-root_linux.go",
+      "classification": "TESTED_ESCAPE_HYPOTHESIS_REJECTED",
+      "tested_hypothesis": "Open/glob/MkdirAll/Create host-outside escape through absolute symlinks",
+      "evidence_run_id": 34769266501,
+      "repeat_count": 3,
+      "result": "PASS_CONTAINMENT",
+      "finding": false,
+      "submission_ready": false,
+      "remaining_review": [
+        "non-escape filesystem semantics"
+      ]
+    },
+    {
       "path": "cmd/nvidia-cdi-hook/create-symlinks/container-root_linux.go",
       "classification": "TESTED_ESCAPE_HYPOTHESIS_REJECTED",
       "tested_hypothesis": "absolute and relative parent-symlink host-outside write escape",
