@@ -3,8 +3,8 @@
 
 This is a prioritizer, not a vulnerability detector. It focuses on implemented
 functions/methods crossing security-sensitive boundaries. Tests, fixtures,
-generated/non-Linux files and declaration-only files are removed before
-scoring. Public fixes remain reference-only exclusions.
+generated/non-Linux files and declaration/configuration-only files are removed
+before scoring. Public fixes remain reference-only exclusions.
 """
 
 from __future__ import annotations
@@ -23,6 +23,12 @@ SENSITIVE_PREFIXES = (
 SKIP_PARTS = {"vendor", "testdata", "tests"}
 SKIP_SUFFIXES = ("_test.go", ".gen.go")
 NON_LINUX_SUFFIXES = ("_other.go", "_windows.go", "_darwin.go", "_freebsd.go")
+CONFIG_ONLY_NAMES = {"options.go", "config.go"}
+PRIVILEGED_OPERATION_TOKENS = (
+    "pivot_root", "pivotRoot", "execve", "exec.Command", "unix.Mount",
+    "os.OpenRoot", "OpenatInRoot", "MkdirAllHandle", "Symlink", "Renameat",
+    "Chmod", "Chown", "os.WriteFile", "os.OpenFile", "unix.Openat",
+)
 WEIGHTS = {
     "pivot_root": 8, "pivotRoot": 8, "execve": 8, "exec.Command": 7,
     "unix.Mount": 7, "os.OpenRoot": 6, "OpenatInRoot": 6,
@@ -42,6 +48,18 @@ def should_skip(rel: str) -> bool:
         or rel.endswith(NON_LINUX_SUFFIXES)
         or "zz_generated" in p.name
     )
+
+
+def is_configuration_only(rel: str, text: str) -> bool:
+    """Drop option/config plumbing unless it performs a privileged operation.
+
+    This avoids spending reproduction cycles on setters/default-resolution code
+    that merely carries sensitive path values. It is a ranking heuristic only.
+    """
+    name = Path(rel).name
+    if name not in CONFIG_ONLY_NAMES:
+        return False
+    return not any(token in text for token in PRIVILEGED_OPERATION_TOKENS)
 
 
 def load_exclusions(path: Path | None) -> dict:
@@ -83,7 +101,7 @@ def rank(root: Path, limit: int = 20, exclusions: dict | None = None) -> list[di
             text = path.read_text(encoding="utf-8")
         except (OSError, UnicodeDecodeError):
             continue
-        if "func " not in text:
+        if "func " not in text or is_configuration_only(rel, text):
             continue
         hits = {token: text.count(token) for token in WEIGHTS if token in text}
         raw_score = sum(WEIGHTS[token] * count for token, count in hits.items())
@@ -125,7 +143,7 @@ def main() -> int:
     except (ValueError, json.JSONDecodeError) as exc:
         raise SystemExit(str(exc)) from exc
     print(json.dumps({
-        "truth": "Linux implemented production-code ranking only; public fixes are reference-only; no vulnerability proof",
+        "truth": "Linux implemented production-code ranking only; configuration-only files are filtered unless they perform privileged operations; public fixes are reference-only; no vulnerability proof",
         "candidates": rank(args.source_root, max(1, args.limit), exclusions),
     }, indent=2, sort_keys=True))
     return 0
