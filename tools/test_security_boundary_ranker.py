@@ -83,6 +83,25 @@ class BoundaryRankerTests(unittest.TestCase):
             out = rank(root)
             self.assertEqual([x["path"] for x in out], ["pkg/nvcdi/impl.go"])
 
+    def test_configuration_only_file_is_removed(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            d = root / "pkg" / "nvcdi"
+            d.mkdir(parents=True)
+            (d / "options.go").write_text("package nvcdi\nfunc WithRoot(){ _ = driverRoot; _ = filepath.Join }", encoding="utf-8")
+            (d / "impl.go").write_text("package nvcdi\nfunc f(){ _ = os.OpenRoot; _ = containerRoot }", encoding="utf-8")
+            out = rank(root)
+            self.assertEqual([x["path"] for x in out], ["pkg/nvcdi/impl.go"])
+
+    def test_configuration_file_with_privileged_operation_remains(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            d = root / "internal" / "oci"
+            d.mkdir(parents=True)
+            (d / "config.go").write_text("package oci\nfunc apply(){ _ = unix.Mount; _ = containerRoot }", encoding="utf-8")
+            out = rank(root)
+            self.assertEqual([x["path"] for x in out], ["internal/oci/config.go"])
+
 
 if __name__ == "__main__":
     unittest.main()
