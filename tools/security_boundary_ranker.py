@@ -1,11 +1,10 @@
 #!/usr/bin/env python3
-"""Rank released Linux production source for defensive bug-bounty review.
+"""Rank released Linux production implementations for defensive review.
 
-This is a prioritizer, not a vulnerability detector. Scores identify production
-code crossing security-sensitive boundaries so local Linux reproduction can
-focus there. Public fixes are reference-only exclusions; nearby untouched files
-get a small adjacency boost while tests, fixtures, generated and non-Linux code
-are removed before scoring.
+This is a prioritizer, not a vulnerability detector. It focuses on implemented
+functions/methods crossing security-sensitive boundaries. Tests, fixtures,
+generated/non-Linux files and declaration-only files are removed before
+scoring. Public fixes remain reference-only exclusions.
 """
 
 from __future__ import annotations
@@ -21,31 +20,16 @@ SENSITIVE_PREFIXES = (
     "internal/oci/",
     "pkg/nvcdi/",
 )
-
 SKIP_PARTS = {"vendor", "testdata", "tests"}
 SKIP_SUFFIXES = ("_test.go", ".gen.go")
 NON_LINUX_SUFFIXES = ("_other.go", "_windows.go", "_darwin.go", "_freebsd.go")
-
 WEIGHTS = {
-    "pivot_root": 8,
-    "pivotRoot": 8,
-    "execve": 8,
-    "exec.Command": 7,
-    "unix.Mount": 7,
-    "os.OpenRoot": 6,
-    "OpenatInRoot": 6,
-    "MkdirAllHandle": 5,
-    "Symlink": 5,
-    "Renameat": 5,
-    "Chmod": 4,
-    "Chown": 4,
-    "containerRoot": 4,
-    "driverRoot": 4,
-    "filepath.Join": 2,
-    "filepath.Clean": 2,
-    "Bundle": 2,
+    "pivot_root": 8, "pivotRoot": 8, "execve": 8, "exec.Command": 7,
+    "unix.Mount": 7, "os.OpenRoot": 6, "OpenatInRoot": 6,
+    "MkdirAllHandle": 5, "Symlink": 5, "Renameat": 5, "Chmod": 4,
+    "Chown": 4, "containerRoot": 4, "driverRoot": 4,
+    "filepath.Join": 2, "filepath.Clean": 2, "Bundle": 2,
 }
-
 PUBLIC_FIX_PENALTY = 10
 ADJACENCY_BONUS = 5
 
@@ -99,18 +83,18 @@ def rank(root: Path, limit: int = 20, exclusions: dict | None = None) -> list[di
             text = path.read_text(encoding="utf-8")
         except (OSError, UnicodeDecodeError):
             continue
+        if "func " not in text:
+            continue
         hits = {token: text.count(token) for token in WEIGHTS if token in text}
         raw_score = sum(WEIGHTS[token] * count for token, count in hits.items())
         if raw_score <= 0:
             continue
-
         public_refs = sorted(set(public_by_file.get(rel, [])))
         public_overlap = bool(public_refs)
         parent = str(Path(rel).parent).replace("\\", "/")
         adjacency_bonus = ADJACENCY_BONUS if parent in fixed_dirs and not public_overlap else 0
         penalty = PUBLIC_FIX_PENALTY if public_overlap else 0
         priority_score = max(1, raw_score + adjacency_bonus - penalty)
-
         ranked.append({
             "path": rel,
             "raw_score": raw_score,
@@ -121,16 +105,8 @@ def rank(root: Path, limit: int = 20, exclusions: dict | None = None) -> list[di
             "adjacency_bonus": adjacency_bonus,
             "finding": False,
             "submission_ready": False,
-            "classification": (
-                "PUBLIC_FIX_OVERLAP_REFERENCE_ONLY"
-                if public_overlap
-                else "UNVERIFIED_BOUNDARY_CANDIDATE"
-            ),
-            "next": (
-                "review_adjacent_behavior_only_do_not_resubmit_public_fix"
-                if public_overlap
-                else "local_review_then_reproduction_if_concrete"
-            ),
+            "classification": "PUBLIC_FIX_OVERLAP_REFERENCE_ONLY" if public_overlap else "UNVERIFIED_BOUNDARY_CANDIDATE",
+            "next": "review_adjacent_behavior_only_do_not_resubmit_public_fix" if public_overlap else "local_review_then_reproduction_if_concrete",
         })
     ranked.sort(key=lambda item: (-item["score"], item["public_fix_overlap"], item["path"]))
     return ranked[:limit]
@@ -149,7 +125,7 @@ def main() -> int:
     except (ValueError, json.JSONDecodeError) as exc:
         raise SystemExit(str(exc)) from exc
     print(json.dumps({
-        "truth": "Linux production-code ranking only; public fixes are reference-only; no vulnerability proof",
+        "truth": "Linux implemented production-code ranking only; public fixes are reference-only; no vulnerability proof",
         "candidates": rank(args.source_root, max(1, args.limit), exclusions),
     }, indent=2, sort_keys=True))
     return 0
