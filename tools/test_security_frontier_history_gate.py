@@ -41,13 +41,20 @@ class FrontierHistoryGateTests(unittest.TestCase):
                     "finding": False,
                     "submission_ready": False,
                 },
+                {
+                    "path": "e.go",
+                    "classification": "DEPRIORITIZED_DISABLED_BY_DEFAULT",
+                    "reason": "hook is disabled by default and requires explicit enablement through non-default configuration",
+                    "finding": False,
+                    "submission_ready": False,
+                },
             ],
         }
 
     def test_valid_history_passes(self):
         out = validate(self.base())
         self.assertEqual(out["gate"], "PASS")
-        self.assertEqual(out["entries"], 4)
+        self.assertEqual(out["entries"], 5)
 
     def test_duplicate_path_fails(self):
         data = self.base()
@@ -88,6 +95,18 @@ class FrontierHistoryGateTests(unittest.TestCase):
     def test_no_privilege_crossing_reason_must_name_boundary(self):
         data = self.base()
         data["primary_deprioritized"][3]["reason"] = "not interesting"
+        with self.assertRaises(ValueError):
+            validate(data)
+
+    def test_disabled_by_default_requires_reason(self):
+        data = self.base()
+        data["primary_deprioritized"][4]["reason"] = ""
+        with self.assertRaises(ValueError):
+            validate(data)
+
+    def test_disabled_by_default_requires_enablement_condition(self):
+        data = self.base()
+        data["primary_deprioritized"][4]["reason"] = "hook is disabled by default"
         with self.assertRaises(ValueError):
             validate(data)
 
