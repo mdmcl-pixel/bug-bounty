@@ -48,6 +48,11 @@ def check_public_fix_registry(candidate: dict, registry_path: Path | None) -> st
         return "public-fix registry target mismatch"
     if registry.get("release") != candidate.get("release"):
         return "public-fix registry release mismatch"
+    expected_commit = registry.get("release_commit")
+    if not expected_commit:
+        return "public-fix registry release commit missing"
+    if candidate.get("release_commit") != expected_commit:
+        return "public-fix registry release commit mismatch"
 
     public_commits = {
         item.get("commit")
@@ -77,8 +82,8 @@ def main() -> int:
     if candidate.get("submission_unlocked") is True:
         return emit_locked("candidate may not self-unlock submission")
 
-    if not candidate.get("target") or not candidate.get("release"):
-        return emit_locked("target/release identity missing")
+    if not candidate.get("target") or not candidate.get("release") or not candidate.get("release_commit"):
+        return emit_locked("target/release/release_commit identity missing")
 
     registry_reason = check_public_fix_registry(candidate, args.public_fix_registry)
     if registry_reason:
@@ -105,6 +110,7 @@ def main() -> int:
         "gate": "READY_FOR_OWNER_REVIEW",
         "target": candidate["target"],
         "release": candidate["release"],
+        "release_commit": candidate["release_commit"],
         "truth": "evidence threshold passed; bounty acceptance and payout remain unverified",
     }, sort_keys=True))
     return 0
