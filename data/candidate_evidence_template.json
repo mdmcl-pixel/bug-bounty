@@ -1,6 +1,7 @@
 {
   "target": "",
   "release": "",
+  "release_commit": "",
   "submission_unlocked": false,
   "in_scope": false,
   "released_code_only": false,
