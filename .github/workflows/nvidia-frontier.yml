@@ -8,6 +8,7 @@ on:
       - 'tools/test_security_frontier_selector.py'
       - 'tools/security_boundary_ranker.py'
       - 'data/nvidia_public_fix_exclusions.json'
+      - 'data/nvidia_frontier_history.json'
   workflow_dispatch:
 
 permissions:
@@ -34,16 +35,16 @@ jobs:
       - name: Verify release identity
         working-directory: nvidia-container-toolkit
         run: test "$(git rev-parse HEAD)" = "$NVIDIA_RELEASE_COMMIT"
-      - name: Build ranking and frontier
+      - name: Build ranking and rotating frontier
         run: |
           set -euo pipefail
           python tools/security_boundary_ranker.py nvidia-container-toolkit --limit 40 --exclusions data/nvidia_public_fix_exclusions.json > boundary-ranking.json
-          python tools/security_frontier_selector.py boundary-ranking.json > frontier.json
+          python tools/security_frontier_selector.py boundary-ranking.json --history data/nvidia_frontier_history.json > frontier.json
           python - <<'PY'
           import json
           d=json.load(open('frontier.json', encoding='utf-8'))
           c=d['candidate']
-          print(f"frontier={c['path']} score={c['score']} finding={d['finding']}")
+          print(f"frontier={c['path']} score={c['score']} deprioritized={d['deprioritized_count']} finding={d['finding']}")
           assert d['finding'] is False and d['submission_ready'] is False
           assert c['public_fix_overlap'] is False
           PY
@@ -73,7 +74,8 @@ jobs:
       - name: Truth marker
         run: |
           echo 'scope=released-v1.20.0-local-ci-only'
-          echo 'frontier=untouched-non-test-released-code'
+          echo 'frontier=rotating-untouched-production-code'
+          echo 'history=tested-hypotheses-deprioritized-not-declared-safe'
           echo 'repeat_count=3'
           echo 'finding=false'
           echo 'submission_unlocked=false'
