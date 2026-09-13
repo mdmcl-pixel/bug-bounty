@@ -5,7 +5,8 @@ This is a prioritizer, not a vulnerability detector. It focuses on implemented
 functions/methods crossing security-sensitive boundaries. Tests, fixtures,
 generated/non-Linux files and declaration/configuration-only files are removed
 before scoring. Public fixes and wrappers that directly depend on public-fixed
-packages remain reference-only exclusions.
+packages remain reference-only exclusions. Host/operator configuration-only
+paths are down-ranked when no container/input proximity signal is present.
 """
 
 from __future__ import annotations
@@ -34,6 +35,11 @@ INPUT_PROXIMITY_TOKENS = (
     "os.Stdin", "json.NewDecoder", "ReadDir(", "entry.Name()", "cli.StringFlag",
     "container-spec", "containerRoot.Open(", "containerRoot.Lstat(", "os.Getenv",
 )
+HOST_CONFIGURATION_TOKENS = (
+    "l.csv.Files", "dxcore.GetDriverStorePaths(", "o.driverRoot", "o.devRoot",
+    "o.librarySearchPaths", "o.configSearchPaths", "populateOptions(",
+    "lookup.WithSearchPaths(",
+)
 WEIGHTS = {
     "pivot_root": 8, "pivotRoot": 8, "execve": 8, "exec.Command": 7,
     "unix.Mount": 7, "os.OpenRoot": 6, "OpenatInRoot": 6,
@@ -43,6 +49,7 @@ WEIGHTS = {
 }
 PUBLIC_FIX_PENALTY = 10
 PUBLIC_FIX_DEPENDENCY_PENALTY = 8
+HOST_CONFIGURATION_ONLY_PENALTY = 5
 ADJACENCY_BONUS = 5
 SOURCE_SINK_BONUS = 6
 MODULE_PREFIX = "github.com/NVIDIA/nvidia-container-toolkit/"
@@ -117,6 +124,8 @@ def rank(root: Path, limit: int = 20, exclusions: dict | None = None) -> list[di
             continue
         input_hits = sorted(token for token in INPUT_PROXIMITY_TOKENS if token in text)
         sink_hits = sorted(token for token in PRIVILEGED_OPERATION_TOKENS if token in text)
+        host_config_hits = sorted(token for token in HOST_CONFIGURATION_TOKENS if token in text)
+        host_config_only = bool(host_config_hits) and not input_hits
         source_sink_bonus = SOURCE_SINK_BONUS if input_hits and sink_hits else 0
         public_refs = sorted(set(public_by_file.get(rel, [])))
         public_overlap = bool(public_refs)
@@ -129,7 +138,7 @@ def rank(root: Path, limit: int = 20, exclusions: dict | None = None) -> list[di
         public_fix_dependency = bool(dependency_refs) and not public_overlap
         parent = str(Path(rel).parent).replace("\\", "/")
         adjacency_bonus = ADJACENCY_BONUS if parent in fixed_dirs and not public_overlap and not public_fix_dependency else 0
-        penalty = 0
+        penalty = HOST_CONFIGURATION_ONLY_PENALTY if host_config_only else 0
         if public_overlap:
             penalty += PUBLIC_FIX_PENALTY
         elif public_fix_dependency:
@@ -152,6 +161,9 @@ def rank(root: Path, limit: int = 20, exclusions: dict | None = None) -> list[di
             "input_proximity_signals": input_hits,
             "privileged_sink_signals": sink_hits,
             "source_sink_bonus": source_sink_bonus,
+            "host_configuration_signals": host_config_hits,
+            "host_configuration_only": host_config_only,
+            "host_configuration_penalty": HOST_CONFIGURATION_ONLY_PENALTY if host_config_only else 0,
             "public_fix_overlap": public_overlap,
             "public_fix_refs": public_refs,
             "public_fix_dependency": public_fix_dependency,
@@ -162,7 +174,7 @@ def rank(root: Path, limit: int = 20, exclusions: dict | None = None) -> list[di
             "classification": classification,
             "next": next_step,
         })
-    ranked.sort(key=lambda item: (-item["score"], item["public_fix_overlap"], item["public_fix_dependency"], item["path"]))
+    ranked.sort(key=lambda item: (-item["score"], item["host_configuration_only"], item["public_fix_overlap"], item["public_fix_dependency"], item["path"]))
     return ranked[:limit]
 
 
@@ -179,7 +191,7 @@ def main() -> int:
     except (ValueError, json.JSONDecodeError) as exc:
         raise SystemExit(str(exc)) from exc
     print(json.dumps({
-        "truth": "Linux implemented production-code ranking only; input-to-privileged-sink proximity is a prioritization signal, not proof of attacker control or vulnerability; configuration-only files are filtered unless they perform privileged operations; public fixes and direct package dependencies are reference-only",
+        "truth": "Linux implemented production-code ranking only; input-to-privileged-sink proximity is a prioritization signal, not proof of attacker control or vulnerability; configuration-only files are filtered unless they perform privileged operations; host/operator configuration-only paths are down-ranked; public fixes and direct package dependencies are reference-only",
         "candidates": rank(args.source_root, max(1, args.limit), exclusions),
     }, indent=2, sort_keys=True))
     return 0
