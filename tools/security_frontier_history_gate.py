@@ -17,6 +17,7 @@ ALLOWED = {
     "DEPRIORITIZED_NO_ATTACKER_CONTROL_SHOWN",
     "DEPRIORITIZED_NO_PRIVILEGE_CROSSING_SHOWN",
     "DEPRIORITIZED_DISABLED_BY_DEFAULT",
+    "DEPRIORITIZED_HOST_CONFIGURATION_ONLY",
 }
 
 
@@ -70,6 +71,16 @@ def validate(data: dict) -> dict:
                 raise ValueError("disabled-by-default reason must explicitly identify default-disabled status")
             if "enable" not in reason and "configuration" not in reason:
                 raise ValueError("disabled-by-default reason must identify the non-default enablement condition")
+        if classification == "DEPRIORITIZED_HOST_CONFIGURATION_ONLY":
+            reason = str(item.get("reason", "")).strip().lower()
+            if not reason:
+                raise ValueError("host-configuration-only entry lacks reason")
+            if "host" not in reason and "operator" not in reason:
+                raise ValueError("host-configuration-only reason must identify host or operator control")
+            if "configuration" not in reason and "config" not in reason:
+                raise ValueError("host-configuration-only reason must identify the configuration boundary")
+            if "container-controlled" not in reason and "attacker" not in reason:
+                raise ValueError("host-configuration-only reason must identify the missing attacker/container-controlled path")
 
     return {
         "gate": "PASS",
