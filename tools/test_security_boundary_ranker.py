@@ -115,6 +115,30 @@ class BoundaryRankerTests(unittest.TestCase):
             self.assertTrue(out[0]["input_proximity_signals"])
             self.assertTrue(out[0]["privileged_sink_signals"])
 
+    def test_direct_public_fix_package_dependency_is_reference_only(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            wrapper = root / "cmd" / "nvidia-cdi-hook" / "update-ldcache" / "wrapper.go"
+            wrapper.parent.mkdir(parents=True)
+            wrapper.write_text(
+                'package x\nimport "github.com/NVIDIA/nvidia-container-toolkit/internal/ldconfig"\nfunc f(){ _ = containerRoot; _ = filepath.Join; _ = ldconfig.NewRunner }',
+                encoding="utf-8",
+            )
+            clean = root / "internal" / "oci" / "clean.go"
+            clean.parent.mkdir(parents=True)
+            clean.write_text("package oci\nfunc f(){ _ = os.OpenRoot; _ = containerRoot }", encoding="utf-8")
+            exclusions = {"public_fixes": [{
+                "commit": "fix123",
+                "classification": "PUBLIC_FIX_EXCLUDE",
+                "affected_files": ["internal/ldconfig/ldconfig_linux.go"],
+            }]}
+            out = rank(root, exclusions=exclusions)
+            item = next(x for x in out if x["path"].endswith("wrapper.go"))
+            self.assertTrue(item["public_fix_dependency"])
+            self.assertEqual(item["public_fix_dependency_refs"], ["fix123"])
+            self.assertEqual(item["classification"], "PUBLIC_FIX_DEPENDENCY_REFERENCE_ONLY")
+            self.assertFalse(item["submission_ready"])
+
 
 if __name__ == "__main__":
     unittest.main()
