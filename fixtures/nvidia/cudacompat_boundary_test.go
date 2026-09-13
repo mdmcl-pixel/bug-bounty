@@ -3,6 +3,7 @@
 package cudacompat
 
 import (
+    "io"
     "os"
     "path/filepath"
     "testing"
@@ -30,7 +31,7 @@ func TestDaisyCudacompatBoundary_OpenAbsoluteSymlinkCannotReadHostOutside(t *tes
     f, err := r.Open("/escape")
     if err == nil {
         defer f.Close()
-        b, readErr := os.ReadFile(f.Name())
+        b, readErr := io.ReadAll(f)
         if readErr == nil && string(b) == "HOST-OUTSIDE" {
             t.Fatal("container-root open escaped to host outside marker")
         }
