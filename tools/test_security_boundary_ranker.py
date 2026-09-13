@@ -102,6 +102,19 @@ class BoundaryRankerTests(unittest.TestCase):
             out = rank(root)
             self.assertEqual([x["path"] for x in out], ["internal/oci/config.go"])
 
+    def test_input_to_privileged_sink_proximity_is_boosted(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            d = root / "internal" / "oci"
+            d.mkdir(parents=True)
+            (d / "source_sink.go").write_text("package oci\nfunc f(){ _ = os.Stdin; _ = os.OpenRoot; _ = containerRoot }", encoding="utf-8")
+            (d / "sink_only.go").write_text("package oci\nfunc f(){ _ = os.OpenRoot; _ = containerRoot }", encoding="utf-8")
+            out = rank(root)
+            self.assertEqual(out[0]["path"], "internal/oci/source_sink.go")
+            self.assertEqual(out[0]["source_sink_bonus"], 6)
+            self.assertTrue(out[0]["input_proximity_signals"])
+            self.assertTrue(out[0]["privileged_sink_signals"])
+
 
 if __name__ == "__main__":
     unittest.main()
