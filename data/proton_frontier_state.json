@@ -1,0 +1,32 @@
+{
+  "version": 1,
+  "updated_at": "2026-09-13T18:46:00Z",
+  "program": "Proton Bug Bounty Program",
+  "asset": "Proton Mail Bridge",
+  "repository": "ProtonMail/proton-bridge",
+  "release": "v3.26.0",
+  "release_commit": "726f7aa62ac993afc67ec566b36243d1c2bafa3d",
+  "evidence_run_id": 34775478171,
+  "baseline": "PASS",
+  "repeat_count": 3,
+  "candidate": {
+    "id": "proton-bridge-post-verify-executable-target-swap",
+    "boundary": "signed update verification to executable launch",
+    "status": "REPRODUCED_PRIMITIVE_IMPACT_NOT_PROVEN",
+    "reproduced": true,
+    "scope_verified": true,
+    "duplicate_checked": false,
+    "security_boundary_crossed": false,
+    "requires_existing_local_write_access": true,
+    "behavior": "a valid signed update can pass VerifyFiles; if the executable path is replaced after verification with a symlink, GetExecutable accepts the symlink path without re-verifying the target",
+    "truth": "local released-code behavior reproduced; no vulnerability, exploitability, privilege escalation, or bounty eligibility is claimed"
+  },
+  "next": [
+    "determine whether an unprivileged attacker can obtain the required post-verification write primitive without equivalent code-execution privilege",
+    "determine whether the launcher/update architecture adds persistence, privilege, or signature-bypass impact beyond existing attacker capability",
+    "check public history and prior reports before any promotion"
+  ],
+  "finding": false,
+  "submission_ready": false,
+  "owner_action_required": false
+}
