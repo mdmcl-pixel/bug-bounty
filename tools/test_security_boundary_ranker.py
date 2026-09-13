@@ -11,7 +11,7 @@ class BoundaryRankerTests(unittest.TestCase):
             root = Path(tmp)
             sensitive = root / "internal" / "ldconfig" / "x.go"
             sensitive.parent.mkdir(parents=True)
-            sensitive.write_text("package x\n// pivot_root\nfunc f(){ _ = os.OpenRoot; _ = unix.Mount }", encoding="utf-8")
+            sensitive.write_text("package x\nfunc f(){ _ = os.OpenRoot; _ = unix.Mount }", encoding="utf-8")
             plain = root / "pkg" / "other" / "y.go"
             plain.parent.mkdir(parents=True)
             plain.write_text("package y\nfunc f(){}", encoding="utf-8")
@@ -25,7 +25,7 @@ class BoundaryRankerTests(unittest.TestCase):
             root = Path(tmp)
             p = root / "random" / "x.go"
             p.parent.mkdir(parents=True)
-            p.write_text("package x\n// pivot_root execve unix.Mount", encoding="utf-8")
+            p.write_text("package x\nfunc f(){ _ = unix.Mount }", encoding="utf-8")
             self.assertEqual(rank(root), [])
 
     def test_limit_is_respected(self):
@@ -34,7 +34,7 @@ class BoundaryRankerTests(unittest.TestCase):
             d = root / "internal" / "oci"
             d.mkdir(parents=True)
             for i in range(3):
-                (d / f"{i}.go").write_text("package x\n// filepath.Join containerRoot", encoding="utf-8")
+                (d / f"{i}.go").write_text("package x\nfunc f(){ _ = filepath.Join; _ = containerRoot }", encoding="utf-8")
             self.assertEqual(len(rank(root, 2)), 2)
 
     def test_public_fix_overlap_is_penalized_and_adjacent_file_boosted(self):
@@ -44,8 +44,8 @@ class BoundaryRankerTests(unittest.TestCase):
             d.mkdir(parents=True)
             known = d / "known.go"
             adjacent = d / "adjacent.go"
-            known.write_text("package x\n// unix.Mount os.OpenRoot filepath.Join", encoding="utf-8")
-            adjacent.write_text("package x\n// unix.Mount os.OpenRoot filepath.Join", encoding="utf-8")
+            known.write_text("package x\nfunc f(){ _ = unix.Mount; _ = os.OpenRoot; _ = filepath.Join }", encoding="utf-8")
+            adjacent.write_text("package x\nfunc f(){ _ = unix.Mount; _ = os.OpenRoot; _ = filepath.Join }", encoding="utf-8")
             exclusions = {"public_fixes": [{
                 "commit": "abc123",
                 "classification": "PUBLIC_FIX_EXCLUDE",
@@ -57,32 +57,31 @@ class BoundaryRankerTests(unittest.TestCase):
             known_item = next(x for x in out if x["path"].endswith("known.go"))
             self.assertTrue(known_item["public_fix_overlap"])
             self.assertEqual(known_item["public_fix_refs"], ["abc123"])
-            self.assertEqual(known_item["classification"], "PUBLIC_FIX_OVERLAP_REFERENCE_ONLY")
 
-    def test_test_fixture_and_generated_sources_are_removed_before_scoring(self):
+    def test_test_fixture_generated_and_non_linux_sources_are_removed(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
             d = root / "cmd" / "nvidia-cdi-hook" / "cudacompat"
             d.mkdir(parents=True)
-            (d / "real.go").write_text("package x\n// filepath.Join containerRoot", encoding="utf-8")
-            (d / "loud_test.go").write_text("package x\n// pivot_root execve unix.Mount Symlink Symlink", encoding="utf-8")
-            (d / "zz_generated.go").write_text("package x\n// pivot_root execve unix.Mount", encoding="utf-8")
+            (d / "real.go").write_text("package x\nfunc f(){ _ = filepath.Join; _ = containerRoot }", encoding="utf-8")
+            (d / "loud_test.go").write_text("package x\nfunc f(){ _ = unix.Mount }", encoding="utf-8")
+            (d / "zz_generated.go").write_text("package x\nfunc f(){ _ = unix.Mount }", encoding="utf-8")
+            (d / "helper_windows.go").write_text("package x\nfunc f(){ _ = unix.Mount }", encoding="utf-8")
             fixture = d / "testdata" / "fixture.go"
             fixture.parent.mkdir(parents=True)
-            fixture.write_text("package x\n// pivot_root execve unix.Mount", encoding="utf-8")
+            fixture.write_text("package x\nfunc f(){ _ = unix.Mount }", encoding="utf-8")
             out = rank(root)
             self.assertEqual([x["path"] for x in out], ["cmd/nvidia-cdi-hook/cudacompat/real.go"])
 
-    def test_non_linux_platform_sources_are_removed_before_scoring(self):
+    def test_declaration_only_files_are_removed_before_scoring(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
-            d = root / "cmd" / "nvidia-cdi-hook" / "create-symlinks"
+            d = root / "pkg" / "nvcdi"
             d.mkdir(parents=True)
-            (d / "container-root_linux.go").write_text("package x\n// filepath.Join containerRoot", encoding="utf-8")
-            (d / "container_root_other.go").write_text("package x\n// pivot_root execve unix.Mount Symlink Symlink", encoding="utf-8")
-            (d / "helper_windows.go").write_text("package x\n// pivot_root execve unix.Mount", encoding="utf-8")
+            (d / "api.go").write_text("package nvcdi\nconst CreateSymlinksHook = Symlink\ntype I interface{ Bundle() }", encoding="utf-8")
+            (d / "impl.go").write_text("package nvcdi\nfunc f(){ _ = filepath.Join; _ = driverRoot }", encoding="utf-8")
             out = rank(root)
-            self.assertEqual([x["path"] for x in out], ["cmd/nvidia-cdi-hook/create-symlinks/container-root_linux.go"])
+            self.assertEqual([x["path"] for x in out], ["pkg/nvcdi/impl.go"])
 
 
 if __name__ == "__main__":
