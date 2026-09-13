@@ -27,13 +27,20 @@ class FrontierHistoryGateTests(unittest.TestCase):
                     "finding": False,
                     "submission_ready": False,
                 },
+                {
+                    "path": "c.go",
+                    "classification": "DEPRIORITIZED_NO_ATTACKER_CONTROL_SHOWN",
+                    "reason": "host-config-derived path with no attacker-controlled input shown",
+                    "finding": False,
+                    "submission_ready": False,
+                },
             ],
         }
 
     def test_valid_history_passes(self):
         out = validate(self.base())
         self.assertEqual(out["gate"], "PASS")
-        self.assertEqual(out["entries"], 2)
+        self.assertEqual(out["entries"], 3)
 
     def test_duplicate_path_fails(self):
         data = self.base()
@@ -50,6 +57,18 @@ class FrontierHistoryGateTests(unittest.TestCase):
     def test_weak_containment_evidence_fails(self):
         data = self.base()
         data["primary_deprioritized"][0]["repeat_count"] = 1
+        with self.assertRaises(ValueError):
+            validate(data)
+
+    def test_no_attacker_control_requires_reason(self):
+        data = self.base()
+        data["primary_deprioritized"][2]["reason"] = ""
+        with self.assertRaises(ValueError):
+            validate(data)
+
+    def test_no_attacker_control_reason_must_name_boundary(self):
+        data = self.base()
+        data["primary_deprioritized"][2]["reason"] = "not interesting"
         with self.assertRaises(ValueError):
             validate(data)
 
