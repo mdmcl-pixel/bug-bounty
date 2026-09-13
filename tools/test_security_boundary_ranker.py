@@ -184,6 +184,28 @@ class BoundaryRankerTests(unittest.TestCase):
             self.assertEqual(item["adjacency_bonus"], 0)
             self.assertFalse(item["submission_ready"])
 
+    def test_candidate_without_privileged_sink_is_down_ranked(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            d = root / "internal" / "oci"
+            d.mkdir(parents=True)
+            sinkless = d / "sinkless.go"
+            sink = d / "sink.go"
+            sinkless.write_text(
+                "package oci\nfunc f(){ _ = filepath.Clean; _ = filepath.Join; _ = Bundle }",
+                encoding="utf-8",
+            )
+            sink.write_text(
+                "package oci\nfunc f(){ _ = os.OpenRoot; _ = filepath.Join }",
+                encoding="utf-8",
+            )
+            out = rank(root)
+            self.assertEqual(out[0]["path"], "internal/oci/sink.go")
+            sinkless_item = next(x for x in out if x["path"].endswith("sinkless.go"))
+            self.assertTrue(sinkless_item["no_privileged_sink"])
+            self.assertEqual(sinkless_item["no_privileged_sink_penalty"], 6)
+            self.assertFalse(out[0]["no_privileged_sink"])
+
 
 if __name__ == "__main__":
     unittest.main()
