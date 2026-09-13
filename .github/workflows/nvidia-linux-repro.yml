@@ -37,10 +37,20 @@ jobs:
           go test ./internal/ldconfig
           go vet ./cmd/nvidia-cdi-hook/... ./internal/ldconfig/...
 
+      - name: Security-sensitive post-release diff triage
+        working-directory: nvidia-container-toolkit
+        run: |
+          set -euo pipefail
+          git fetch origin main --depth=120
+          echo '=== security-sensitive changed paths ==='
+          git diff --name-only HEAD..origin/main | grep -E '^(cmd/nvidia-cdi-hook/|internal/(ldconfig|modifier|oci)/|pkg/nvcdi/)' || true
+          echo '=== security-sensitive commits ==='
+          git log --oneline --no-merges HEAD..origin/main -- cmd/nvidia-cdi-hook internal/ldconfig internal/modifier internal/oci pkg/nvcdi | head -80
+
       - name: Truth marker
         run: |
           printf '%s\n' \
             'release=v1.20.0' \
             'environment=ubuntu-latest' \
             'scope=local-ci-only' \
-            'truth=baseline success is not vulnerability proof'
+            'truth=baseline success and diff signals are not vulnerability proof'
