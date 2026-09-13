@@ -1,10 +1,11 @@
 #!/usr/bin/env python3
 """Rank released source files for defensive bug-bounty review.
 
-This is a prioritizer, not a vulnerability detector. Scores identify code that
-crosses security-sensitive boundaries so local reproduction can focus there.
-Public fixes are reference-only exclusions; nearby untouched files get a small
-adjacency boost so the search moves away from known fixes toward new issues.
+This is a prioritizer, not a vulnerability detector. Scores identify production
+code crossing security-sensitive boundaries so local reproduction can focus
+there. Public fixes are reference-only exclusions; nearby untouched files get
+a small adjacency boost while tests, fixtures and generated code are removed
+before scoring.
 """
 
 from __future__ import annotations
@@ -20,6 +21,9 @@ SENSITIVE_PREFIXES = (
     "internal/oci/",
     "pkg/nvcdi/",
 )
+
+SKIP_PARTS = {"vendor", "testdata", "tests"}
+SKIP_SUFFIXES = ("_test.go", ".gen.go")
 
 WEIGHTS = {
     "pivot_root": 8,
@@ -43,6 +47,15 @@ WEIGHTS = {
 
 PUBLIC_FIX_PENALTY = 10
 ADJACENCY_BONUS = 5
+
+
+def should_skip(rel: str) -> bool:
+    p = Path(rel)
+    return (
+        any(part in SKIP_PARTS for part in p.parts)
+        or rel.endswith(SKIP_SUFFIXES)
+        or "zz_generated" in p.name
+    )
 
 
 def load_exclusions(path: Path | None) -> dict:
@@ -78,7 +91,7 @@ def rank(root: Path, limit: int = 20, exclusions: dict | None = None) -> list[di
     ranked: list[dict] = []
     for path in root.rglob("*.go"):
         rel = path.relative_to(root).as_posix()
-        if not rel.startswith(SENSITIVE_PREFIXES):
+        if not rel.startswith(SENSITIVE_PREFIXES) or should_skip(rel):
             continue
         try:
             text = path.read_text(encoding="utf-8")
@@ -107,7 +120,7 @@ def rank(root: Path, limit: int = 20, exclusions: dict | None = None) -> list[di
             "finding": False,
             "submission_ready": False,
             "classification": (
-                "PUBLIC_FIX_ADJACENT_REVIEW_ONLY"
+                "PUBLIC_FIX_OVERLAP_REFERENCE_ONLY"
                 if public_overlap
                 else "UNVERIFIED_BOUNDARY_CANDIDATE"
             ),
@@ -134,7 +147,7 @@ def main() -> int:
     except (ValueError, json.JSONDecodeError) as exc:
         raise SystemExit(str(exc)) from exc
     print(json.dumps({
-        "truth": "ranking only; public fixes are reference-only; no vulnerability proof",
+        "truth": "production-code ranking only; public fixes are reference-only; no vulnerability proof",
         "candidates": rank(args.source_root, max(1, args.limit), exclusions),
     }, indent=2, sort_keys=True))
     return 0
