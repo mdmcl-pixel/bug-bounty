@@ -6,8 +6,8 @@ functions/methods crossing security-sensitive boundaries. Tests, fixtures,
 generated/non-Linux files and declaration/configuration-only files are removed
 before scoring. Public fixes, explicit dependent files, and wrappers that
 directly depend on public-fixed packages remain reference-only exclusions.
-Host/operator configuration-only paths are down-ranked when no container/input
-proximity signal is present.
+Host/operator configuration-only paths and paths without an identified
+privileged sink are down-ranked rather than declared safe.
 """
 
 from __future__ import annotations
@@ -51,6 +51,7 @@ WEIGHTS = {
 PUBLIC_FIX_PENALTY = 10
 PUBLIC_FIX_DEPENDENCY_PENALTY = 8
 HOST_CONFIGURATION_ONLY_PENALTY = 5
+NO_PRIVILEGED_SINK_PENALTY = 6
 ADJACENCY_BONUS = 5
 SOURCE_SINK_BONUS = 6
 MODULE_PREFIX = "github.com/NVIDIA/nvidia-container-toolkit/"
@@ -132,6 +133,7 @@ def rank(root: Path, limit: int = 20, exclusions: dict | None = None) -> list[di
         sink_hits = sorted(token for token in PRIVILEGED_OPERATION_TOKENS if token in text)
         host_config_hits = sorted(token for token in HOST_CONFIGURATION_TOKENS if token in text)
         host_config_only = bool(host_config_hits) and not input_hits
+        no_privileged_sink = not sink_hits
         source_sink_bonus = SOURCE_SINK_BONUS if input_hits and sink_hits else 0
         public_refs = sorted(set(public_by_file.get(rel, [])))
         public_overlap = bool(public_refs)
@@ -147,7 +149,11 @@ def rank(root: Path, limit: int = 20, exclusions: dict | None = None) -> list[di
         public_fix_dependency = bool(dependency_refs) and not public_overlap
         parent = str(Path(rel).parent).replace("\\", "/")
         adjacency_bonus = ADJACENCY_BONUS if parent in fixed_dirs and not public_overlap and not public_fix_dependency else 0
-        penalty = HOST_CONFIGURATION_ONLY_PENALTY if host_config_only else 0
+        penalty = 0
+        if host_config_only:
+            penalty += HOST_CONFIGURATION_ONLY_PENALTY
+        if no_privileged_sink:
+            penalty += NO_PRIVILEGED_SINK_PENALTY
         if public_overlap:
             penalty += PUBLIC_FIX_PENALTY
         elif public_fix_dependency:
@@ -170,6 +176,8 @@ def rank(root: Path, limit: int = 20, exclusions: dict | None = None) -> list[di
             "input_proximity_signals": input_hits,
             "privileged_sink_signals": sink_hits,
             "source_sink_bonus": source_sink_bonus,
+            "no_privileged_sink": no_privileged_sink,
+            "no_privileged_sink_penalty": NO_PRIVILEGED_SINK_PENALTY if no_privileged_sink else 0,
             "host_configuration_signals": host_config_hits,
             "host_configuration_only": host_config_only,
             "host_configuration_penalty": HOST_CONFIGURATION_ONLY_PENALTY if host_config_only else 0,
@@ -183,7 +191,7 @@ def rank(root: Path, limit: int = 20, exclusions: dict | None = None) -> list[di
             "classification": classification,
             "next": next_step,
         })
-    ranked.sort(key=lambda item: (-item["score"], item["host_configuration_only"], item["public_fix_overlap"], item["public_fix_dependency"], item["path"]))
+    ranked.sort(key=lambda item: (-item["score"], item["no_privileged_sink"], item["host_configuration_only"], item["public_fix_overlap"], item["public_fix_dependency"], item["path"]))
     return ranked[:limit]
 
 
@@ -200,7 +208,7 @@ def main() -> int:
     except (ValueError, json.JSONDecodeError) as exc:
         raise SystemExit(str(exc)) from exc
     print(json.dumps({
-        "truth": "Linux implemented production-code ranking only; input-to-privileged-sink proximity is a prioritization signal, not proof of attacker control or vulnerability; configuration-only files are filtered unless they perform privileged operations; host/operator configuration-only paths are down-ranked; public fixes, explicit dependent files, and direct package dependencies are reference-only",
+        "truth": "Linux implemented production-code ranking only; input-to-privileged-sink proximity is a prioritization signal, not proof of attacker control or vulnerability; configuration-only files are filtered unless they perform privileged operations; paths without identified privileged sinks and host/operator configuration-only paths are down-ranked; public fixes, explicit dependent files, and direct package dependencies are reference-only",
         "candidates": rank(args.source_root, max(1, args.limit), exclusions),
     }, indent=2, sort_keys=True))
     return 0
