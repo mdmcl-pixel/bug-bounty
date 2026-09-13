@@ -9,6 +9,7 @@ on:
       - 'tools/security_frontier_history_gate.py'
       - 'tools/test_security_frontier_history_gate.py'
       - 'tools/security_boundary_ranker.py'
+      - 'tools/test_security_boundary_ranker.py'
       - 'data/nvidia_public_fix_exclusions.json'
       - 'data/nvidia_frontier_history.json'
   workflow_dispatch:
@@ -30,10 +31,13 @@ jobs:
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v5
-      - name: Verify selector and history gates
+      - name: Verify ranker, selector and history gates
         run: |
           set -euo pipefail
-          python -m unittest tools/test_security_frontier_selector.py tools/test_security_frontier_history_gate.py
+          python -m unittest \
+            tools/test_security_boundary_ranker.py \
+            tools/test_security_frontier_selector.py \
+            tools/test_security_frontier_history_gate.py
           python tools/security_frontier_history_gate.py data/nvidia_frontier_history.json
       - name: Checkout exact released source
         run: git clone --depth 1 --branch "$NVIDIA_RELEASE" https://github.com/NVIDIA/nvidia-container-toolkit.git nvidia-container-toolkit
@@ -81,6 +85,7 @@ jobs:
           echo 'scope=released-v1.20.0-local-ci-only'
           echo 'frontier=rotating-untouched-linux-production-code'
           echo 'history_gate=fail-closed'
+          echo 'ranker_gate=fail-closed'
           echo 'history=tested-hypotheses-deprioritized-not-declared-safe'
           echo 'repeat_count=3'
           echo 'finding=false'
