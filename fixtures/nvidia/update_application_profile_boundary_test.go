@@ -37,6 +37,10 @@ func TestDaisyUpdateApplicationProfileBoundary_SymlinkCannotWriteHostOutside(t *
 
 func TestDaisyUpdateApplicationProfileBoundary_NormalInRootWriteWorks(t *testing.T) {
     containerRootDir := t.TempDir()
+    if err := os.MkdirAll(filepath.Join(containerRootDir, "etc", "nvidia"), 0755); err != nil {
+        t.Fatal(err)
+    }
+
     root, err := os.OpenRoot(containerRootDir)
     if err != nil {
         t.Fatal(err)
