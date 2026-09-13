@@ -12,11 +12,7 @@
       "result": "PASS_CONTAINMENT",
       "finding": false,
       "submission_ready": false,
-      "remaining_review": [
-        "ELF and version-selection trust logic",
-        "state-to-hook input trust boundary",
-        "non-escape logic flaws"
-      ]
+      "remaining_review": ["ELF and version-selection trust logic", "state-to-hook input trust boundary", "non-escape logic flaws"]
     },
     {
       "path": "cmd/nvidia-cdi-hook/cudacompat/container-root_linux.go",
@@ -27,9 +23,7 @@
       "result": "PASS_CONTAINMENT",
       "finding": false,
       "submission_ready": false,
-      "remaining_review": [
-        "non-escape filesystem semantics"
-      ]
+      "remaining_review": ["non-escape filesystem semantics"]
     },
     {
       "path": "cmd/nvidia-cdi-hook/create-symlinks/container-root_linux.go",
@@ -40,10 +34,7 @@
       "result": "PASS_CONTAINMENT",
       "finding": false,
       "submission_ready": false,
-      "remaining_review": [
-        "atomic replacement race semantics",
-        "link target trust and hook argument logic"
-      ]
+      "remaining_review": ["atomic replacement race semantics", "link target trust and hook argument logic"]
     },
     {
       "path": "cmd/nvidia-cdi-hook/update-application-profile/update-application-profile.go",
@@ -54,11 +45,15 @@
       "result": "PASS_CONTAINMENT",
       "finding": false,
       "submission_ready": false,
-      "remaining_review": [
-        "device-minor selection trust logic",
-        "OCI state to container-root trust boundary",
-        "non-escape logic flaws"
-      ]
+      "remaining_review": ["device-minor selection trust logic", "OCI state to container-root trust boundary", "non-escape logic flaws"]
+    },
+    {
+      "path": "pkg/nvcdi/driver-nvml.go",
+      "classification": "DEPRIORITIZED_NO_ATTACKER_CONTROL_SHOWN",
+      "reason": "primary roots, library search paths, firmware paths, and driver metadata are derived from host/runtime configuration and host driver state; no container-controlled input crossing a privilege boundary was identified in source review",
+      "finding": false,
+      "submission_ready": false,
+      "remaining_review": ["revisit only if a container-controlled input path into these discoverers is demonstrated"]
     },
     {
       "path": "pkg/nvcdi/transform/root/container-root.go",
@@ -75,5 +70,5 @@
       "submission_ready": false
     }
   ],
-  "truth": "Deprioritization rotates primary review after tested hypotheses or public-fix dependencies; it never declares a file vulnerability-free."
+  "truth": "Deprioritization rotates primary review after tested hypotheses, public-fix dependencies, or absence of attacker-controlled privilege crossing; it never declares a file vulnerability-free."
 }
