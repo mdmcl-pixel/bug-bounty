@@ -73,6 +73,17 @@ class BoundaryRankerTests(unittest.TestCase):
             out = rank(root)
             self.assertEqual([x["path"] for x in out], ["cmd/nvidia-cdi-hook/cudacompat/real.go"])
 
+    def test_non_linux_platform_sources_are_removed_before_scoring(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            d = root / "cmd" / "nvidia-cdi-hook" / "create-symlinks"
+            d.mkdir(parents=True)
+            (d / "container-root_linux.go").write_text("package x\n// filepath.Join containerRoot", encoding="utf-8")
+            (d / "container_root_other.go").write_text("package x\n// pivot_root execve unix.Mount Symlink Symlink", encoding="utf-8")
+            (d / "helper_windows.go").write_text("package x\n// pivot_root execve unix.Mount", encoding="utf-8")
+            out = rank(root)
+            self.assertEqual([x["path"] for x in out], ["cmd/nvidia-cdi-hook/create-symlinks/container-root_linux.go"])
+
 
 if __name__ == "__main__":
     unittest.main()
