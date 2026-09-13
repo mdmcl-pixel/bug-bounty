@@ -2,7 +2,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from security_boundary_ranker import rank
+from tools.security_boundary_ranker import rank
 
 
 class BoundaryRankerTests(unittest.TestCase):
