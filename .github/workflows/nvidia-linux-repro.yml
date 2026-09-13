@@ -43,9 +43,9 @@ jobs:
           set -euo pipefail
           git fetch origin main --depth=120
           echo '=== security-sensitive changed paths ==='
-          git diff --name-only HEAD..origin/main | grep -E '^(cmd/nvidia-cdi-hook/|internal/(ldconfig|modifier|oci)/|pkg/nvcdi/)' || true
+          git diff --name-only HEAD..FETCH_HEAD -- | grep -E '^(cmd/nvidia-cdi-hook/|internal/(ldconfig|modifier|oci)/|pkg/nvcdi/)' || true
           echo '=== security-sensitive commits ==='
-          git log --oneline --no-merges HEAD..origin/main -- cmd/nvidia-cdi-hook internal/ldconfig internal/modifier internal/oci pkg/nvcdi | head -80
+          git log --oneline --no-merges HEAD..FETCH_HEAD -- cmd/nvidia-cdi-hook internal/ldconfig internal/modifier internal/oci pkg/nvcdi | sed -n '1,80p' || true
 
       - name: Truth marker
         run: |
