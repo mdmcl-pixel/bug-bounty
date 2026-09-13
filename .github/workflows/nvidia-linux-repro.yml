@@ -1,0 +1,46 @@
+name: NVIDIA Linux Repro
+
+on:
+  push:
+    paths:
+      - '.github/workflows/nvidia-linux-repro.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: nvidia-linux-repro
+  cancel-in-progress: true
+
+jobs:
+  repro:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - name: Checkout released NVIDIA Container Toolkit
+        run: git clone --depth 1 --branch v1.20.0 https://github.com/NVIDIA/nvidia-container-toolkit.git nvidia-container-toolkit
+
+      - uses: actions/setup-go@v6
+        with:
+          go-version: '1.25.x'
+          cache: false
+
+      - name: Released-code Linux baseline
+        working-directory: nvidia-container-toolkit
+        run: |
+          set -euo pipefail
+          go test ./cmd/nvidia-cdi-hook/cudacompat
+          go test ./cmd/nvidia-cdi-hook/create-symlinks
+          go test ./cmd/nvidia-cdi-hook/disable-device-node-modification
+          go test ./cmd/nvidia-cdi-hook/update-application-profile
+          go test ./internal/ldconfig
+          go vet ./cmd/nvidia-cdi-hook/... ./internal/ldconfig/...
+
+      - name: Truth marker
+        run: |
+          printf '%s\n' \
+            'release=v1.20.0' \
+            'environment=ubuntu-latest' \
+            'scope=local-ci-only' \
+            'truth=baseline success is not vulnerability proof'
