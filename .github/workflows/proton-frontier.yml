@@ -1,0 +1,52 @@
+name: Proton Frontier
+
+on:
+  push:
+    paths:
+      - '.github/workflows/proton-frontier.yml'
+      - 'tools/proton_versioner_boundary_test.go'
+      - 'data/high_value_target_queue.json'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: proton-frontier
+  cancel-in-progress: true
+
+env:
+  PROTON_RELEASE: v3.26.0
+  PROTON_RELEASE_COMMIT: 726f7aa62ac993afc67ec566b36243d1c2bafa3d
+
+jobs:
+  update-boundary:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v5
+      - name: Checkout exact released Proton Bridge source
+        run: git clone --depth 1 --branch "$PROTON_RELEASE" https://github.com/ProtonMail/proton-bridge.git proton-bridge
+      - name: Verify exact release identity
+        working-directory: proton-bridge
+        run: test "$(git rev-parse HEAD)" = "$PROTON_RELEASE_COMMIT"
+      - name: Add isolated local boundary test
+        run: cp tools/proton_versioner_boundary_test.go proton-bridge/internal/versioner/daisy_update_boundary_test.go
+      - uses: actions/setup-go@v6
+        with:
+          go-version: '1.26.5'
+          cache: false
+      - name: Baseline released packages
+        working-directory: proton-bridge
+        run: go test -count=1 ./pkg/sum ./internal/versioner
+      - name: Repeat post-verification target-swap reproduction
+        working-directory: proton-bridge
+        run: go test -count=3 ./internal/versioner -run '^TestDaisyPostVerificationExecutableTargetSwap$'
+      - name: Truth marker
+        run: |
+          echo 'scope=ProtonMail/proton-bridge-v3.26.0-local-ci-only'
+          echo 'behavior=post-verification-executable-target-swap-reproduced'
+          echo 'repeat_count=3'
+          echo 'finding=false'
+          echo 'submission_unlocked=false'
+          echo 'impact_proof_required=true'
