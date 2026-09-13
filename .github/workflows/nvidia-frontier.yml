@@ -45,23 +45,34 @@ jobs:
         working-directory: nvidia-container-toolkit
         run: test "$(git rev-parse HEAD)" = "$NVIDIA_RELEASE_COMMIT"
       - name: Build ranking and rotating frontier
+        id: select
         run: |
           set -euo pipefail
           python tools/security_boundary_ranker.py nvidia-container-toolkit --limit 40 --exclusions data/nvidia_public_fix_exclusions.json > boundary-ranking.json
           python tools/security_frontier_selector.py boundary-ranking.json --history data/nvidia_frontier_history.json > frontier.json
           python - <<'PY'
-          import json
+          import json, os
           d=json.load(open('frontier.json', encoding='utf-8'))
-          c=d['candidate']
-          print(f"frontier={c['path']} score={c['score']} deprioritized={d['deprioritized_count']} finding={d['finding']}")
           assert d['finding'] is False and d['submission_ready'] is False
-          assert c['public_fix_overlap'] is False
+          exhausted=bool(d.get('exhausted'))
+          if exhausted:
+              assert d.get('candidate') is None
+              print(f"frontier=EXHAUSTED deprioritized={d['deprioritized_count']} finding={d['finding']}")
+          else:
+              c=d['candidate']
+              print(f"frontier={c['path']} score={c['score']} deprioritized={d['deprioritized_count']} finding={d['finding']}")
+              assert c['public_fix_overlap'] is False
+          with open(os.environ['GITHUB_OUTPUT'], 'a', encoding='utf-8') as fh:
+              fh.write(f"has_candidate={'false' if exhausted else 'true'}\n")
+              fh.write(f"exhausted={'true' if exhausted else 'false'}\n")
           PY
       - uses: actions/setup-go@v6
+        if: steps.select.outputs.has_candidate == 'true'
         with:
           go-version: '1.25.x'
           cache: false
       - name: Repeat-test frontier package
+        if: steps.select.outputs.has_candidate == 'true'
         run: |
           set -euo pipefail
           pkg="$(python - <<'PY'
@@ -87,6 +98,6 @@ jobs:
           echo 'history_gate=fail-closed'
           echo 'ranker_gate=fail-closed'
           echo 'history=tested-hypotheses-deprioritized-not-declared-safe'
-          echo 'repeat_count=3'
+          echo "frontier_exhausted=${{ steps.select.outputs.exhausted }}"
           echo 'finding=false'
           echo 'submission_unlocked=false'
