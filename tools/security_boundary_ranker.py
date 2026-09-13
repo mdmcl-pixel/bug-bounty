@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
-"""Rank released source files for defensive bug-bounty review.
+"""Rank released Linux production source for defensive bug-bounty review.
 
 This is a prioritizer, not a vulnerability detector. Scores identify production
-code crossing security-sensitive boundaries so local reproduction can focus
-there. Public fixes are reference-only exclusions; nearby untouched files get
-a small adjacency boost while tests, fixtures and generated code are removed
-before scoring.
+code crossing security-sensitive boundaries so local Linux reproduction can
+focus there. Public fixes are reference-only exclusions; nearby untouched files
+get a small adjacency boost while tests, fixtures, generated and non-Linux code
+are removed before scoring.
 """
 
 from __future__ import annotations
@@ -24,6 +24,7 @@ SENSITIVE_PREFIXES = (
 
 SKIP_PARTS = {"vendor", "testdata", "tests"}
 SKIP_SUFFIXES = ("_test.go", ".gen.go")
+NON_LINUX_SUFFIXES = ("_other.go", "_windows.go", "_darwin.go", "_freebsd.go")
 
 WEIGHTS = {
     "pivot_root": 8,
@@ -54,6 +55,7 @@ def should_skip(rel: str) -> bool:
     return (
         any(part in SKIP_PARTS for part in p.parts)
         or rel.endswith(SKIP_SUFFIXES)
+        or rel.endswith(NON_LINUX_SUFFIXES)
         or "zz_generated" in p.name
     )
 
@@ -147,7 +149,7 @@ def main() -> int:
     except (ValueError, json.JSONDecodeError) as exc:
         raise SystemExit(str(exc)) from exc
     print(json.dumps({
-        "truth": "production-code ranking only; public fixes are reference-only; no vulnerability proof",
+        "truth": "Linux production-code ranking only; public fixes are reference-only; no vulnerability proof",
         "candidates": rank(args.source_root, max(1, args.limit), exclusions),
     }, indent=2, sort_keys=True))
     return 0
