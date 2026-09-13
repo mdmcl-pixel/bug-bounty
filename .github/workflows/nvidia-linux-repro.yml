@@ -4,6 +4,8 @@ on:
   push:
     paths:
       - '.github/workflows/nvidia-linux-repro.yml'
+      - 'tools/security_evidence_gate.py'
+      - 'tools/test_security_evidence_gate.py'
   workflow_dispatch:
 
 permissions:
@@ -22,6 +24,12 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 12
     steps:
+      - name: Checkout audit harness
+        uses: actions/checkout@v5
+
+      - name: Verify fail-closed evidence gate
+        run: python -m unittest tools/test_security_evidence_gate.py
+
       - name: Checkout released NVIDIA Container Toolkit
         run: git clone --depth 1 --branch "$NVIDIA_RELEASE" https://github.com/NVIDIA/nvidia-container-toolkit.git nvidia-container-toolkit
 
@@ -88,5 +96,6 @@ jobs:
             'environment=ubuntu-latest' \
             'scope=local-ci-only' \
             'repeat_count=3' \
+            'evidence_gate=fail-closed' \
             'submission_unlocked=false' \
             'truth=baseline success and public diff signals are not vulnerability proof'
