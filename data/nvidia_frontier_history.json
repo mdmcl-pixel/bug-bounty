@@ -17,7 +17,35 @@
         "state-to-hook input trust boundary",
         "non-escape logic flaws"
       ]
+    },
+    {
+      "path": "cmd/nvidia-cdi-hook/create-symlinks/container-root_linux.go",
+      "classification": "TESTED_ESCAPE_HYPOTHESIS_REJECTED",
+      "tested_hypothesis": "absolute and relative parent-symlink host-outside write escape",
+      "evidence_run_id": 34769458349,
+      "repeat_count": 3,
+      "result": "PASS_CONTAINMENT",
+      "finding": false,
+      "submission_ready": false,
+      "remaining_review": [
+        "atomic replacement race semantics",
+        "link target trust and hook argument logic"
+      ]
+    },
+    {
+      "path": "pkg/nvcdi/transform/root/container-root.go",
+      "classification": "PUBLIC_FIX_DEPENDENCY_REFERENCE_ONLY",
+      "reason": "delegates path transformation to pkg/nvcdi/transform/root/root.go, which is covered by public fix 60691e995bd2d9bbc1bc671a4bd235f98543b1a5",
+      "finding": false,
+      "submission_ready": false
+    },
+    {
+      "path": "pkg/nvcdi/transform/root/driver-root.go",
+      "classification": "PUBLIC_FIX_DEPENDENCY_REFERENCE_ONLY",
+      "reason": "constructs transformers through New() backed by pkg/nvcdi/transform/root/root.go, which is covered by public fix 60691e995bd2d9bbc1bc671a4bd235f98543b1a5",
+      "finding": false,
+      "submission_ready": false
     }
   ],
-  "truth": "Deprioritization only rotates primary review after a tested hypothesis is rejected; it does not declare a file vulnerability-free."
+  "truth": "Deprioritization rotates primary review after tested hypotheses or public-fix dependencies; it never declares a file vulnerability-free."
 }
