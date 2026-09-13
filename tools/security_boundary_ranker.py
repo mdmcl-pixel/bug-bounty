@@ -29,6 +29,10 @@ PRIVILEGED_OPERATION_TOKENS = (
     "os.OpenRoot", "OpenatInRoot", "MkdirAllHandle", "Symlink", "Renameat",
     "Chmod", "Chown", "os.WriteFile", "os.OpenFile", "unix.Openat",
 )
+INPUT_PROXIMITY_TOKENS = (
+    "os.Stdin", "json.NewDecoder", "ReadDir(", "entry.Name()", "cli.StringFlag",
+    "container-spec", "containerRoot.Open(", "containerRoot.Lstat(", "os.Getenv",
+)
 WEIGHTS = {
     "pivot_root": 8, "pivotRoot": 8, "execve": 8, "exec.Command": 7,
     "unix.Mount": 7, "os.OpenRoot": 6, "OpenatInRoot": 6,
@@ -38,6 +42,7 @@ WEIGHTS = {
 }
 PUBLIC_FIX_PENALTY = 10
 ADJACENCY_BONUS = 5
+SOURCE_SINK_BONUS = 6
 
 
 def should_skip(rel: str) -> bool:
@@ -51,11 +56,7 @@ def should_skip(rel: str) -> bool:
 
 
 def is_configuration_only(rel: str, text: str) -> bool:
-    """Drop option/config plumbing unless it performs a privileged operation.
-
-    This avoids spending reproduction cycles on setters/default-resolution code
-    that merely carries sensitive path values. It is a ranking heuristic only.
-    """
+    """Drop option/config plumbing unless it performs a privileged operation."""
     name = Path(rel).name
     if name not in CONFIG_ONLY_NAMES:
         return False
@@ -107,17 +108,23 @@ def rank(root: Path, limit: int = 20, exclusions: dict | None = None) -> list[di
         raw_score = sum(WEIGHTS[token] * count for token, count in hits.items())
         if raw_score <= 0:
             continue
+        input_hits = sorted(token for token in INPUT_PROXIMITY_TOKENS if token in text)
+        sink_hits = sorted(token for token in PRIVILEGED_OPERATION_TOKENS if token in text)
+        source_sink_bonus = SOURCE_SINK_BONUS if input_hits and sink_hits else 0
         public_refs = sorted(set(public_by_file.get(rel, [])))
         public_overlap = bool(public_refs)
         parent = str(Path(rel).parent).replace("\\", "/")
         adjacency_bonus = ADJACENCY_BONUS if parent in fixed_dirs and not public_overlap else 0
         penalty = PUBLIC_FIX_PENALTY if public_overlap else 0
-        priority_score = max(1, raw_score + adjacency_bonus - penalty)
+        priority_score = max(1, raw_score + adjacency_bonus + source_sink_bonus - penalty)
         ranked.append({
             "path": rel,
             "raw_score": raw_score,
             "score": priority_score,
             "signals": sorted(hits),
+            "input_proximity_signals": input_hits,
+            "privileged_sink_signals": sink_hits,
+            "source_sink_bonus": source_sink_bonus,
             "public_fix_overlap": public_overlap,
             "public_fix_refs": public_refs,
             "adjacency_bonus": adjacency_bonus,
@@ -143,7 +150,7 @@ def main() -> int:
     except (ValueError, json.JSONDecodeError) as exc:
         raise SystemExit(str(exc)) from exc
     print(json.dumps({
-        "truth": "Linux implemented production-code ranking only; configuration-only files are filtered unless they perform privileged operations; public fixes are reference-only; no vulnerability proof",
+        "truth": "Linux implemented production-code ranking only; input-to-privileged-sink proximity is a prioritization signal, not proof of attacker control or vulnerability; configuration-only files are filtered unless they perform privileged operations; public fixes are reference-only",
         "candidates": rank(args.source_root, max(1, args.limit), exclusions),
     }, indent=2, sort_keys=True))
     return 0
