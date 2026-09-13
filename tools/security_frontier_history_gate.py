@@ -15,6 +15,7 @@ ALLOWED = {
     "TESTED_ESCAPE_HYPOTHESIS_REJECTED",
     "PUBLIC_FIX_DEPENDENCY_REFERENCE_ONLY",
     "DEPRIORITIZED_NO_ATTACKER_CONTROL_SHOWN",
+    "DEPRIORITIZED_NO_PRIVILEGE_CROSSING_SHOWN",
 }
 
 
@@ -53,6 +54,13 @@ def validate(data: dict) -> dict:
                 raise ValueError("no-attacker-control entry lacks reason")
             if "attacker" not in reason.lower() and "container-controlled" not in reason.lower():
                 raise ValueError("no-attacker-control reason must identify the missing attacker-controlled boundary")
+        if classification == "DEPRIORITIZED_NO_PRIVILEGE_CROSSING_SHOWN":
+            reason = str(item.get("reason", "")).strip()
+            if not reason:
+                raise ValueError("no-privilege-crossing entry lacks reason")
+            lower = reason.lower()
+            if "privilege" not in lower and "host" not in lower and "container-local" not in lower:
+                raise ValueError("no-privilege-crossing reason must identify why impact remains below the protected boundary")
 
     return {
         "gate": "PASS",
