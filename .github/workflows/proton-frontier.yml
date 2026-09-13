@@ -5,6 +5,9 @@ on:
     paths:
       - '.github/workflows/proton-frontier.yml'
       - 'tools/proton_versioner_boundary_test.go'
+      - 'tools/proton_impact_gate.py'
+      - 'tools/test_proton_impact_gate.py'
+      - 'data/proton_frontier_state.json'
       - 'data/high_value_target_queue.json'
   workflow_dispatch:
 
@@ -25,6 +28,20 @@ jobs:
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v5
+      - name: Verify fail-closed impact gate
+        run: |
+          set -euo pipefail
+          python -m unittest tools/test_proton_impact_gate.py
+          python tools/proton_impact_gate.py data/proton_frontier_state.json > proton-impact-gate.json
+          python - <<'PY'
+          import json
+          d=json.load(open('proton-impact-gate.json', encoding='utf-8'))
+          assert d['gate'] == 'PARKED_IMPACT_NOT_PROVEN'
+          assert d['finding'] is False
+          assert d['submission_ready'] is False
+          assert d['owner_action_required'] is False
+          print(f"impact_gate={d['gate']} finding={d['finding']}")
+          PY
       - name: Checkout exact released Proton Bridge source
         run: git clone --depth 1 --branch "$PROTON_RELEASE" https://github.com/ProtonMail/proton-bridge.git proton-bridge
       - name: Verify exact release identity
@@ -42,11 +59,20 @@ jobs:
       - name: Repeat post-verification target-swap reproduction
         working-directory: proton-bridge
         run: go test -count=3 ./internal/versioner -run '^TestDaisyPostVerificationExecutableTargetSwap$'
+      - name: Preserve evidence artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: proton-frontier-evidence
+          path: |
+            data/proton_frontier_state.json
+            proton-impact-gate.json
+          retention-days: 7
       - name: Truth marker
         run: |
           echo 'scope=ProtonMail/proton-bridge-v3.26.0-local-ci-only'
           echo 'behavior=post-verification-executable-target-swap-reproduced'
           echo 'repeat_count=3'
+          echo 'impact_gate=fail-closed'
           echo 'finding=false'
           echo 'submission_unlocked=false'
           echo 'impact_proof_required=true'
