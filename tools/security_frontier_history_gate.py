@@ -16,6 +16,7 @@ ALLOWED = {
     "PUBLIC_FIX_DEPENDENCY_REFERENCE_ONLY",
     "DEPRIORITIZED_NO_ATTACKER_CONTROL_SHOWN",
     "DEPRIORITIZED_NO_PRIVILEGE_CROSSING_SHOWN",
+    "DEPRIORITIZED_DISABLED_BY_DEFAULT",
 }
 
 
@@ -61,6 +62,14 @@ def validate(data: dict) -> dict:
             lower = reason.lower()
             if "privilege" not in lower and "host" not in lower and "container-local" not in lower:
                 raise ValueError("no-privilege-crossing reason must identify why impact remains below the protected boundary")
+        if classification == "DEPRIORITIZED_DISABLED_BY_DEFAULT":
+            reason = str(item.get("reason", "")).strip().lower()
+            if not reason:
+                raise ValueError("disabled-by-default entry lacks reason")
+            if "disabled by default" not in reason:
+                raise ValueError("disabled-by-default reason must explicitly identify default-disabled status")
+            if "enable" not in reason and "configuration" not in reason:
+                raise ValueError("disabled-by-default reason must identify the non-default enablement condition")
 
     return {
         "gate": "PASS",
