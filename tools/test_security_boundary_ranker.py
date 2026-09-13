@@ -139,6 +139,28 @@ class BoundaryRankerTests(unittest.TestCase):
             self.assertEqual(item["classification"], "PUBLIC_FIX_DEPENDENCY_REFERENCE_ONLY")
             self.assertFalse(item["submission_ready"])
 
+    def test_host_configuration_only_candidate_is_down_ranked(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            d = root / "pkg" / "nvcdi"
+            d.mkdir(parents=True)
+            host_cfg = d / "host.go"
+            boundary = d / "boundary.go"
+            host_cfg.write_text(
+                "package nvcdi\nfunc f(){ _ = l.csv.Files; _ = filepath.Join; _ = driverRoot }",
+                encoding="utf-8",
+            )
+            boundary.write_text(
+                "package nvcdi\nfunc f(){ _ = filepath.Join; _ = driverRoot }",
+                encoding="utf-8",
+            )
+            out = rank(root)
+            self.assertEqual(out[0]["path"], "pkg/nvcdi/boundary.go")
+            host_item = next(x for x in out if x["path"].endswith("host.go"))
+            self.assertTrue(host_item["host_configuration_only"])
+            self.assertEqual(host_item["host_configuration_penalty"], 5)
+            self.assertTrue(host_item["host_configuration_signals"])
+
 
 if __name__ == "__main__":
     unittest.main()
